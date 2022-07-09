@@ -1,0 +1,5 @@
+server {
+    location /calendar.svg {
+        proxy_pass http://calendar-svg/;
+    }
+}

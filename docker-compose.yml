@@ -1,7 +1,21 @@
-version: '2'
+version: '3'
 
 services:
+  nginx:
+    image: nginx
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates
+      - ./static:/etc/nginx/html
+    ports:
+      - "8080:80"
+    env_file:
+      - .env
+    healthcheck:
+      test: curl --fail http://localhost/health || exit 1
+      interval: 60s
+      retries: 5
+      timeout: 10s
+    depends_on:
+      - calendar-svg
   calendar-svg:
     build: https://github.com/eikhr/calendar-svg.git
-    ports:
-      - "3000:3000"
