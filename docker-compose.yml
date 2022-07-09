@@ -1,0 +1,7 @@
+version: '2'
+
+services:
+  calendar-svg:
+    build: https://github.com/eikhr/calendar-svg.git
+    ports:
+      - "3000:3000"
