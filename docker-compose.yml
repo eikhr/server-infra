@@ -28,7 +28,7 @@ services:
       - ./certbot/www/:/var/www/certbot/:rw
       - ./certbot/conf/:/etc/letsencrypt/:rw
   calendar-svg:
-    build: http://github.com/eikhr/calendar-svg.git
+    build: git@github.com/eikhr/calendar-svg
   groupup-frontend:
     build:
       context: ./groupup
@@ -52,3 +52,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  filebrowser:
+    image: hurlenko/filebrowser
+    volumes:
+      - ./filebrowser/DATA_DIR:/data
+      - ./filebrowser/CONFIG_DIR:/config
+    environment:
+      - FB_DATABASE=/data/filebrowser.db
+      - FB_BASEURL=/filebrowser
+    restart: always
+
