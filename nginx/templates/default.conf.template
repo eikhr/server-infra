@@ -1,4 +1,27 @@
 server {
+    listen 80;
+    listen [::]:80;
+
+    server_name ${NGINX_DOMAIN} www.${NGINX_DOMAIN};
+    server_tokens off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://www.${NGINX_DOMAIN}$request_uri;
+    }
+}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    server_name www.${NGINX_DOMAIN};
+
+    ssl_certificate /etc/nginx/ssl/live/www.${NGINX_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/live/www.${NGINX_DOMAIN}/privkey.pem;
+
     location /calendar.svg {
         add_header Access-Control-Allow-Origin *;
         proxy_pass http://calendar-svg/;
@@ -6,7 +29,29 @@ server {
 }
 
 server {
+    listen 80;
+    listen [::]:80;
+
     server_name groupup.${NGINX_DOMAIN};
+    server_tokens off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://groupup.${NGINX_DOMAIN}$request_uri;
+    }
+}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    server_name groupup.${NGINX_DOMAIN};
+
+    ssl_certificate /etc/nginx/ssl/live/groupup.${NGINX_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/live/groupup.${NGINX_DOMAIN}/privkey.pem;
+
     location /api {
         proxy_pass http://groupup-backend;
     }

@@ -6,8 +6,12 @@ services:
     volumes:
       - ./nginx/templates:/etc/nginx/templates
       - ./static:/etc/nginx/html
+      - ./certbot/www:/var/www/certbot/:ro
+      - ./certbot/conf/:/etc/nginx/ssl/:ro
     ports:
       - "80:80"
+      - "443:443"
+    restart: always
     env_file:
       - .env
     healthcheck:
@@ -18,6 +22,11 @@ services:
     depends_on:
       - calendar-svg
       - groupup-frontend
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - ./certbot/www/:/var/www/certbot/:rw
+      - ./certbot/conf/:/etc/letsencrypt/:rw
   calendar-svg:
     build: http://github.com/eikhr/calendar-svg.git
   groupup-frontend:
