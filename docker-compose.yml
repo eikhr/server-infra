@@ -1,4 +1,4 @@
-version: '3'
+version: '3.8'
 
 services:
   nginx:
@@ -7,7 +7,7 @@ services:
       - ./nginx/templates:/etc/nginx/templates
       - ./static:/etc/nginx/html
     ports:
-      - "8080:80"
+      - "80:80"
     env_file:
       - .env
     healthcheck:
@@ -17,5 +17,29 @@ services:
       timeout: 10s
     depends_on:
       - calendar-svg
+      - groupup-frontend
   calendar-svg:
-    build: https://github.com/eikhr/calendar-svg.git
+    build: http://github.com/eikhr/calendar-svg.git
+  groupup-frontend:
+    build:
+      context: ./groupup
+      dockerfile: frontend.Dockerfile
+    depends_on:
+      - groupup-backend
+  groupup-backend:
+    build:
+      context: ./groupup
+      dockerfile: backend.Dockerfile
+    depends_on:
+      - groupup-db
+  groupup-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: groupup
+      POSTGRES_DB: groupupdb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

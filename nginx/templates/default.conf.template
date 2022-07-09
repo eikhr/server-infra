@@ -3,3 +3,13 @@ server {
         proxy_pass http://calendar-svg/;
     }
 }
+
+server {
+    server_name groupup.${NGINX_DOMAIN};
+    location /api {
+        proxy_pass http://groupup-backend;
+    }
+    location / {
+        proxy_pass http://groupup-frontend;
+    }
+}
