@@ -1,5 +1,6 @@
 server {
     location /calendar.svg {
+        add_header Access-Control-Allow-Origin *;
         proxy_pass http://calendar-svg/;
     }
 }
