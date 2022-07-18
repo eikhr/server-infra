@@ -81,3 +81,24 @@ server {
         proxy_pass http://groupup-frontend;
     }
 }
+
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name bitwarden.${NGINX_DOMAIN};
+
+    location / {
+        proxy_pass http://localhost:81;
+    }
+}
+server {
+    listen 443;
+    listen [::]:443;
+
+    server_name bitwarden.${NGINX_DOMAIN};
+
+    location / {
+        proxy_pass http://localhost:444;
+    }
+}
