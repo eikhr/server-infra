@@ -5,12 +5,15 @@ services:
     image: nginx
     volumes:
       - ./nginx/templates:/etc/nginx/templates
+      - ./nginx/sslcerts:/etc/nginx/sslcerts
       - ./static:/etc/nginx/html
       - ./certbot/www:/var/www/certbot/:ro
       - ./certbot/conf/:/etc/nginx/ssl/:ro
     ports:
       - "80:80"
       - "443:443"
+    extra_hosts:
+      - "localnode:${LOCAL_IP_ADDRESS}"
     restart: always
     env_file:
       - .env
