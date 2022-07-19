@@ -1,2 +1,5 @@
 .idea
 .env
+
+filebrowser/DATA_DIR
+filebrowser/CONFIG_DIR/filebrowser.db
