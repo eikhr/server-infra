@@ -32,6 +32,15 @@ services:
       - ./certbot/conf/:/etc/letsencrypt/:rw
   calendar-svg:
     build: git@github.com/eikhr/calendar-svg
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: always
+    env_file:
+      - vaultwarden.env
+    volumes:
+      - ./vaultwarden-data/:/data/
+
   groupup-frontend:
     build:
       context: ./groupup

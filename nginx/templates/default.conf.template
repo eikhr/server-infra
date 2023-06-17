@@ -94,7 +94,7 @@ server {
     }
 
     location / {
-        proxy_pass http://localnode:81;
+        return 301 https://bitwarden.${NGINX_DOMAIN}$request_uri;
     }
 }
 server {
@@ -115,7 +115,7 @@ server {
     ssl_prefer_server_ciphers on;
 
     location / {
-        proxy_pass https://localnode:444;
+        proxy_pass http://vaultwarden;
         proxy_ssl_trusted_certificate /etc/nginx/sslcerts/bitwarden.pem;
         proxy_ssl_verify off;
     }
