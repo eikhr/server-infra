@@ -31,7 +31,7 @@ services:
       - ./certbot/www/:/var/www/certbot/:rw
       - ./certbot/conf/:/etc/letsencrypt/:rw
   calendar-svg:
-    build: git@github.com/eikhr/calendar-svg
+    build: https://github.com/eikhr/calendar-svg.git
   vaultwarden:
     image: vaultwarden/server:latest
     container_name: vaultwarden
@@ -40,7 +40,13 @@ services:
       - vaultwarden.env
     volumes:
       - ./vaultwarden-data/:/data/
-
+  warehouse-server:
+    build:
+      context: https://github.com/ollfkaih/warehouse.git#docker-server
+      dockerfile: server.Dockerfile
+    volumes:
+      - ./warehouse-data:/root/warehouse
+    restart: always
   groupup-frontend:
     build:
       context: ./groupup
