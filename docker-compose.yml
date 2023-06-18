@@ -1,64 +1,97 @@
 version: '3.8'
 
 services:
-  nginx:
-    image: nginx
-    volumes:
-      - ./nginx/templates:/etc/nginx/templates
-      - ./nginx/sslcerts:/etc/nginx/sslcerts
-      - ./static:/etc/nginx/html
-      - ./certbot/www:/var/www/certbot/:ro
-      - ./certbot/conf/:/etc/nginx/ssl/:ro
+  
+  traefik:
+    image: traefik:v2.10
+    command:
+      - "--api"
+      - "--providers.docker"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      #- "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.myresolver.acme.email=eik@eikhr.no"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     ports:
       - "80:80"
       - "443:443"
-    extra_hosts:
-      - "localnode:${LOCAL_IP_ADDRESS}"
-    restart: always
-    env_file:
-      - .env
-    healthcheck:
-      test: curl --fail http://localhost/health || exit 1
-      interval: 60s
-      retries: 5
-      timeout: 10s
-    depends_on:
-      - calendar-svg
-      - groupup-frontend
-  certbot:
-    image: certbot/certbot:latest
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
     volumes:
-      - ./certbot/www/:/var/www/certbot/:rw
-      - ./certbot/conf/:/etc/letsencrypt/:rw
+      - "./data/letsencrypt:/letsencrypt"
+      - "./data/traefik:/data"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.eikhr.no`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certresolver=myresolver"
+      - "traefik.http.routers.traefik.middlewares=myauth"
+      - "traefik.http.middlewares.myauth.basicauth.usersfile=/data/usersfile"
+
   calendar-svg:
     build: https://github.com/eikhr/calendar-svg.git
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.calendar-svg.rule=Host(`www.eikhr.no`) && Path(`/calendar.svg`)"
+      - "traefik.http.routers.calendar-svg.entrypoints=websecure"
+      - "traefik.http.routers.calendar-svg.tls.certresolver=myresolver"
+        
   vaultwarden:
     image: vaultwarden/server:latest
-    container_name: vaultwarden
     restart: always
     env_file:
       - vaultwarden.env
     volumes:
-      - ./vaultwarden-data/:/data/
+      - ./data/vaultwarden/:/data/
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vaultwarden.rule=Host(`bitwarden.eikhr.no`)"
+      - "traefik.http.routers.vaultwarden.entrypoints=websecure"
+      - "traefik.http.routers.vaultwarden.tls.certresolver=myresolver"
+
   warehouse-server:
     build:
       context: https://github.com/ollfkaih/warehouse.git#docker-server
       dockerfile: server.Dockerfile
     volumes:
-      - ./warehouse-data:/root/warehouse
+      - ./data/warehouse:/root/warehouse
     restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.warehouse-server.rule=Host(`warehouse.eikhr.no`)"
+      - "traefik.http.routers.warehouse-server.entrypoints=websecure"
+      - "traefik.http.routers.warehouse-server.tls.certresolver=myresolver"
+
   groupup-frontend:
     build:
       context: ./groupup
       dockerfile: frontend.Dockerfile
     depends_on:
       - groupup-backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.groupup-frontend.rule=Host(`groupup.eikhr.no`)"
+      - "traefik.http.routers.groupup-frontend.entrypoints=websecure"
+      - "traefik.http.routers.groupup-frontend.tls.certresolver=myresolver"
+
   groupup-backend:
     build:
       context: ./groupup
       dockerfile: backend.Dockerfile
     depends_on:
       - groupup-db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.groupup-backend.rule=Host(`groupup.eikhr.no`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.groupup-backend.entrypoints=websecure"
+      - "traefik.http.routers.groupup-backend.tls.certresolver=myresolver"
+
   groupup-db:
     image: postgres
     environment:
@@ -70,15 +103,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    volumes:
+      - ./data/groupup/pgdata:/var/lib/postgresql/data
+
   filebrowser:
     image: hurlenko/filebrowser
     volumes:
-      - ./filebrowser/DATA_DIR:/data
-      - ./filebrowser/CONFIG_DIR:/config
+      - ./data/filebrowser/DATA_DIR:/data
+      - ./data/filebrowser/CONFIG_DIR:/config
     environment:
       - FB_DATABASE=/data/filebrowser.db
       - FB_BASEURL=/filebrowser
     restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.filebrowser.rule=Host(`www.eikhr.no`) && PathPrefix(`/filebrowser`)"
+      - "traefik.http.routers.filebrowser.entrypoints=websecure"
+      - "traefik.http.routers.filebrowser.tls.certresolver=myresolver"
+
   minecraft:
     image: itzg/minecraft-server
     ports:
@@ -89,5 +131,5 @@ services:
     stdin_open: true
     restart: unless-stopped
     volumes:
-      # attach a directory relative to the directory containing this compose file
-      - ./minecraft-data:/data
+      - ./data/minecraft:/data
+
