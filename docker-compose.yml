@@ -61,6 +61,7 @@ services:
       dockerfile: server.Dockerfile
     volumes:
       - ./data/warehouse:/root/warehouse
+      - /etc/localtime:/etc/localtime:ro
     restart: always
     labels:
       - "traefik.enable=true"
@@ -109,8 +110,8 @@ services:
   filebrowser:
     image: hurlenko/filebrowser
     volumes:
-      - ./data/filebrowser/DATA_DIR:/data
-      - ./data/filebrowser/CONFIG_DIR:/config
+      - ./filebrowser/DATA_DIR:/data
+      - ./filebrowser/CONFIG_DIR:/config
     environment:
       - FB_DATABASE=/data/filebrowser.db
       - FB_BASEURL=/filebrowser
@@ -120,6 +121,15 @@ services:
       - "traefik.http.routers.filebrowser.rule=Host(`www.eikhr.no`) && PathPrefix(`/filebrowser`)"
       - "traefik.http.routers.filebrowser.entrypoints=websecure"
       - "traefik.http.routers.filebrowser.tls.certresolver=myresolver"
+
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: duckdns
+    environment:
+      - SUBDOMAINS=eik-hr
+      - TOKEN=${DUCKDNS_TOKEN}
+      - LOG_FILE=true
+    restart: unless-stopped
 
   minecraft:
     image: itzg/minecraft-server
