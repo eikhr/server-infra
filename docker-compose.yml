@@ -20,7 +20,7 @@ services:
       - "80:80"
       - "443:443"
       # The Web UI (enabled by --api.insecure=true)
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - "./data/letsencrypt:/letsencrypt"
       - "./data/traefik:/data"
@@ -121,6 +121,15 @@ services:
       - "traefik.http.routers.filebrowser.rule=Host(`www.eikhr.no`) && PathPrefix(`/filebrowser`)"
       - "traefik.http.routers.filebrowser.entrypoints=websecure"
       - "traefik.http.routers.filebrowser.tls.certresolver=myresolver"
+
+  www:
+    build: https://github.com/eikhr/eikhr.github.io.git
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.www.rule=Host(`www.eikhr.no`)"
+      - "traefik.http.routers.www.entrypoints=websecure"
+      - "traefik.http.routers.www.tls.certresolver=myresolver"
+      - "traefik.http.routers.www.priority=1"
 
   duckdns:
     image: lscr.io/linuxserver/duckdns:latest
