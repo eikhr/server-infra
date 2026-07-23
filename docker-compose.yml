@@ -1,7 +1,10 @@
-version: '3.8'
+# server-infra on eik-desktop — revived 2026-07.
+# Trimmed from the original: dropped vaultwarden, filebrowser, and the duckdns
+# container (the FritzBox handles DuckDNS now). Public via FritzBox port-forward
+# 80/443 -> 192.168.188.194. Home Assistant is a separate stack, not proxied.
 
 services:
-  
+
   traefik:
     image: traefik:v2.10
     command:
@@ -16,10 +19,11 @@ services:
       #- "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
       - "--certificatesresolvers.myresolver.acme.email=eik@eikhr.no"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
-      # The Web UI (enabled by --api.insecure=true)
+      # dashboard, bound to localhost only
       - "127.0.0.1:8080:8080"
     volumes:
       - "./data/letsencrypt:/letsencrypt"
@@ -34,45 +38,30 @@ services:
       - "traefik.http.routers.traefik.middlewares=myauth"
       - "traefik.http.middlewares.myauth.basicauth.usersfile=/data/usersfile"
 
+  www:
+    build: https://github.com/eikhr/eikhr.github.io.git
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.www.rule=Host(`www.eikhr.no`)"
+      - "traefik.http.routers.www.entrypoints=websecure"
+      - "traefik.http.routers.www.tls.certresolver=myresolver"
+      - "traefik.http.routers.www.priority=1"
+
   calendar-svg:
     build: https://github.com/eikhr/calendar-svg.git
+    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.calendar-svg.rule=Host(`www.eikhr.no`) && Path(`/calendar.svg`)"
       - "traefik.http.routers.calendar-svg.entrypoints=websecure"
       - "traefik.http.routers.calendar-svg.tls.certresolver=myresolver"
-        
-  vaultwarden:
-    image: vaultwarden/server:latest
-    restart: always
-    env_file:
-      - vaultwarden.env
-    volumes:
-      - ./data/vaultwarden/:/data/
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.vaultwarden.rule=Host(`bitwarden.eikhr.no`)"
-      - "traefik.http.routers.vaultwarden.entrypoints=websecure"
-      - "traefik.http.routers.vaultwarden.tls.certresolver=myresolver"
-
-  warehouse-server:
-    build:
-      context: https://github.com/ollfkaih/warehouse.git#docker-server
-      dockerfile: server.Dockerfile
-    volumes:
-      - ./data/warehouse:/root/warehouse
-      - /etc/localtime:/etc/localtime:ro
-    restart: always
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.warehouse-server.rule=Host(`warehouse.eikhr.no`)"
-      - "traefik.http.routers.warehouse-server.entrypoints=websecure"
-      - "traefik.http.routers.warehouse-server.tls.certresolver=myresolver"
 
   groupup-frontend:
     build:
       context: ./groupup
       dockerfile: frontend.Dockerfile
+    restart: unless-stopped
     depends_on:
       - groupup-backend
     labels:
@@ -85,6 +74,7 @@ services:
     build:
       context: ./groupup
       dockerfile: backend.Dockerfile
+    restart: unless-stopped
     depends_on:
       - groupup-db
     labels:
@@ -95,6 +85,7 @@ services:
 
   groupup-db:
     image: postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: groupup
@@ -107,38 +98,19 @@ services:
     volumes:
       - ./data/groupup/pgdata:/var/lib/postgresql/data
 
-  filebrowser:
-    image: hurlenko/filebrowser
-    volumes:
-      - ./filebrowser/DATA_DIR:/data
-      - ./filebrowser/CONFIG_DIR:/config
-    environment:
-      - FB_DATABASE=/data/filebrowser.db
-      - FB_BASEURL=/filebrowser
-    restart: always
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.filebrowser.rule=Host(`www.eikhr.no`) && PathPrefix(`/filebrowser`)"
-      - "traefik.http.routers.filebrowser.entrypoints=websecure"
-      - "traefik.http.routers.filebrowser.tls.certresolver=myresolver"
-
-  www:
-    build: https://github.com/eikhr/eikhr.github.io.git
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.www.rule=Host(`www.eikhr.no`)"
-      - "traefik.http.routers.www.entrypoints=websecure"
-      - "traefik.http.routers.www.tls.certresolver=myresolver"
-      - "traefik.http.routers.www.priority=1"
-
-  duckdns:
-    image: lscr.io/linuxserver/duckdns:latest
-    container_name: duckdns
-    environment:
-      - SUBDOMAINS=eik-hr
-      - TOKEN=${DUCKDNS_TOKEN}
-      - LOG_FILE=true
+  warehouse-server:
+    build:
+      context: https://github.com/ollfkaih/warehouse.git#docker-server
+      dockerfile: server.Dockerfile
     restart: unless-stopped
+    volumes:
+      - ./data/warehouse:/root/warehouse
+      - /etc/localtime:/etc/localtime:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.warehouse-server.rule=Host(`warehouse.eikhr.no`)"
+      - "traefik.http.routers.warehouse-server.entrypoints=websecure"
+      - "traefik.http.routers.warehouse-server.tls.certresolver=myresolver"
 
   minecraft:
     image: itzg/minecraft-server
@@ -151,4 +123,3 @@ services:
     restart: unless-stopped
     volumes:
       - ./data/minecraft:/data
-
