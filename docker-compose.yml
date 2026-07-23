@@ -84,7 +84,9 @@ services:
       - "traefik.http.routers.groupup-backend.tls.certresolver=myresolver"
 
   groupup-db:
-    image: postgres
+    # Pinned: bare `postgres` now resolves to 18+, which changed its data-dir
+    # layout and won't start against the /var/lib/postgresql/data mount below.
+    image: postgres:16
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres

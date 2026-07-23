@@ -9,7 +9,8 @@ COPY --from=downloader /git/GroupUp/backend/ .
 
 RUN mvn clean package -DskipTests
 
-FROM openjdk:17-jdk-alpine as production
+# openjdk images were removed from Docker Hub; eclipse-temurin is the successor.
+FROM eclipse-temurin:17-jre-alpine as production
 
 COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 80
