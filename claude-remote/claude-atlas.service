@@ -1,0 +1,22 @@
+[Unit]
+Description=Claude Code Remote Control (atlas)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/code/atlas/worktrees/main
+# systemd does not read shell init, so PATH is spelled out. The fnm "default"
+# alias path is used rather than a version-pinned one so Node upgrades do not
+# silently break the unit. ~/.bun/bin is required by the atlas CLI.
+Environment=PATH=%h/.bun/bin:%h/.local/share/fnm/aliases/default/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=%h
+ExecStart=%h/.local/bin/claude remote-control --spawn worktree --name atlas --permission-mode auto
+Restart=always
+RestartSec=10
+# This box also runs Home Assistant plus the warehouse and groupup stacks.
+# pnpm install and test runs are bursty across 12 cores; keep them deprioritised.
+Nice=10
+
+[Install]
+WantedBy=default.target
