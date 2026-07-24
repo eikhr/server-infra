@@ -53,8 +53,10 @@ if [ -z "$warm_failed" ]; then
     || warm_failed="codegen"
 fi
 
-# atlas-cli sits outside the workspace globs, so it installs standalone.
-(cd "$target/atlas-cli" && pnpm install --ignore-workspace) >&2 || true
+# atlas-cli sits outside the pnpm workspace globs and is bun-based (bun.lock).
+# Using pnpm here would write a stray pnpm-lock.yaml that is not gitignored,
+# leaving every worktree dirty and inviting an accidental commit.
+(cd "$target/atlas-cli" && bun install --frozen-lockfile) >&2 || true
 
 if [ -n "$warm_failed" ]; then
   cat > "$target/WORKTREE-WARMUP-FAILED.md" <<NOTE
