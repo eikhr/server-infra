@@ -129,6 +129,20 @@ services:
       - "traefik.http.routers.warehouse-webapp.tls.certresolver=myresolver"
       - "traefik.http.routers.warehouse-webapp.priority=1"
 
+  # The JavaFX warehouse client ported to web via WebFX (transpiled to JS).
+  # Static GWT build output served by nginx; source on eikhr/warehouse
+  # (branch webfx-spike). The html dir lives under data/ (git-ignored).
+  warehouse-webfx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    volumes:
+      - ./data/warehouse-webfx:/usr/share/nginx/html:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.warehouse-webfx.rule=Host(`warehouse-webfx.eikhr.no`)"
+      - "traefik.http.routers.warehouse-webfx.entrypoints=websecure"
+      - "traefik.http.routers.warehouse-webfx.tls.certresolver=myresolver"
+
   minecraft:
     image: itzg/minecraft-server
     ports:
