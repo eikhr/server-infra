@@ -143,6 +143,34 @@ services:
       - "traefik.http.routers.warehouse-webfx.entrypoints=websecure"
       - "traefik.http.routers.warehouse-webfx.tls.certresolver=myresolver"
 
+  # Read-only viewer for Claude's .ai/tmp scratch output across Atlas worktrees,
+  # so HTML/markdown reports generated over SSH open in a browser. Mounts the
+  # worktrees read-only; the app exposes only <worktree>/.ai/tmp/**. Behind the
+  # same basicauth as the Traefik dashboard. See claude-reports/README.md.
+  claude-reports:
+    build:
+      context: ./claude-reports
+    restart: unless-stopped
+    # /home/eik is drwxr-x---, so only uid 1000 can traverse into the mount.
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      WORKTREES_ROOT: /worktrees
+      SITE_TITLE: Claude reports
+    volumes:
+      - /home/eik/code/atlas/worktrees:/worktrees:ro
+      - /etc/localtime:/etc/localtime:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.claude-reports.rule=Host(`reports.eikhr.no`)"
+      - "traefik.http.routers.claude-reports.entrypoints=websecure"
+      - "traefik.http.routers.claude-reports.tls.certresolver=myresolver"
+      - "traefik.http.routers.claude-reports.middlewares=myauth@docker"
+
   minecraft:
     image: itzg/minecraft-server
     ports:

@@ -11,3 +11,6 @@ warehouse-data
 minecraft-data
 
 data
+
+__pycache__/
+*.pyc
