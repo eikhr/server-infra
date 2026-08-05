@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Read-only browser for Claude's .ai/tmp scratch output across Atlas worktrees.
+"""Read-only browser for Claude's .ai scratch output across Atlas worktrees.
 
-The whole worktrees directory is mounted, but only <root>/<worktree>/.ai/tmp/**
-is ever exposed. Every request fully resolves symlinks and re-checks containment,
-so neither `..` traversal nor a symlink planted inside .ai/tmp can reach source
-code, .env files, or anything else in the checkout.
+The whole worktrees directory is mounted, but only the directories named in
+SOURCE_DIRS (.ai/tmp and .ai/scratchpads) under each worktree are ever exposed.
+Every request fully resolves symlinks and re-checks containment against the one
+source dir it addresses, so neither `..` traversal nor a symlink planted inside
+a source dir can reach source code, .env files, or anything else in the checkout.
+
+A file's public relpath is prefixed with its source key — `tmp/report.html`,
+`scratchpads/design.md` — which keeps the two namespaces from colliding and
+tells the reader where the file actually lives.
 """
 
 from __future__ import annotations
@@ -30,7 +35,13 @@ from pygments.lexers import get_lexer_for_filename
 from pygments.util import ClassNotFound
 
 ROOT = Path(os.environ.get("WORKTREES_ROOT", "/worktrees")).resolve()
-TMP_PARTS = (".ai", "tmp")
+
+# key -> path under the worktree. The key is the first segment of every public
+# relpath, so renaming one changes URLs; adding one is free.
+SOURCE_DIRS: dict[str, tuple[str, ...]] = {
+    "tmp": (".ai", "tmp"),
+    "scratchpads": (".ai", "scratchpads"),
+}
 PORT = int(os.environ.get("PORT", "8080"))
 TITLE = os.environ.get("SITE_TITLE", "Claude reports")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -56,80 +67,97 @@ TEXT_EXTS = {
 # Path safety
 # --------------------------------------------------------------------------
 
-def tmp_dir_for(worktree: str) -> Path | None:
-    """Resolve <root>/<worktree>/.ai/tmp, or None if it is missing or escapes."""
+def source_dirs_for(worktree: str) -> dict[str, Path]:
+    """Resolved {key: dir} for the source dirs this worktree actually has.
+
+    Empty if the worktree name is bogus, missing, or has none of them.
+    """
     if not worktree or worktree in (".", "..") or "/" in worktree or "\\" in worktree:
-        return None
+        return {}
     if "\x00" in worktree or worktree.startswith("."):
-        return None
+        return {}
 
     wt = ROOT / worktree
     try:
         wt_real = wt.resolve(strict=True)
-        tmp_real = (wt / Path(*TMP_PARTS)).resolve(strict=True)
     except (OSError, RuntimeError, ValueError):
-        return None
+        return {}
+    # The worktree must sit directly under the root.
+    if wt_real.parent != ROOT:
+        return {}
 
-    # The worktree must sit directly under the root, and .ai/tmp must stay
-    # inside that worktree — a symlinked .ai/tmp pointing elsewhere is rejected.
-    try:
-        if wt_real.parent != ROOT:
-            return None
-        tmp_real.relative_to(wt_real)
-    except ValueError:
-        return None
+    found: dict[str, Path] = {}
+    for key, parts in SOURCE_DIRS.items():
+        try:
+            real = (wt / Path(*parts)).resolve(strict=True)
+        except (OSError, RuntimeError, ValueError):
+            continue
+        # A source dir symlinked out of the worktree is rejected.
+        try:
+            real.relative_to(wt_real)
+        except ValueError:
+            continue
+        if real.is_dir():
+            found[key] = real
+    return found
 
-    return tmp_real if tmp_real.is_dir() else None
 
-
-def resolve_within(tmp_real: Path, relpath: str) -> Path | None:
-    """Resolve relpath under an already-resolved .ai/tmp dir, or None if it escapes."""
+def resolve_within(root_real: Path, relpath: str) -> Path | None:
+    """Resolve relpath under an already-resolved source dir, or None if it escapes."""
     if "\x00" in relpath:
         return None
-    candidate = tmp_real.joinpath(relpath)
+    candidate = root_real.joinpath(relpath)
     try:
         real = candidate.resolve(strict=True)
-        real.relative_to(tmp_real)
+        real.relative_to(root_real)
     except (OSError, RuntimeError, ValueError):
         return None
     return real if real.is_file() else None
 
 
-def list_worktrees() -> list[tuple[str, Path, int, float]]:
-    """(name, tmp_dir, file_count, newest_mtime) for worktrees that have files."""
+def resolve_file(worktree: str, rel: str) -> Path | None:
+    """Resolve a public relpath (`<source-key>/<path>`) to a real file, or None."""
+    key, _, remainder = rel.partition("/")
+    root = source_dirs_for(worktree).get(key)
+    if root is None or not remainder:
+        return None
+    return resolve_within(root, remainder)
+
+
+def list_worktrees() -> list[tuple[str, int, float]]:
+    """(name, file_count, newest_mtime) for worktrees that have files."""
     out = []
     try:
         entries = sorted(p.name for p in ROOT.iterdir() if p.is_dir())
     except OSError:
         return out
     for name in entries:
-        tmp = tmp_dir_for(name)
-        if tmp is None:
-            continue
-        files = list_files(tmp)
+        files = list_files(name)
         if not files:
             continue
         newest = max(f[2] for f in files)
-        out.append((name, tmp, len(files), newest))
-    out.sort(key=lambda r: r[3], reverse=True)
+        out.append((name, len(files), newest))
+    out.sort(key=lambda r: r[2], reverse=True)
     return out
 
 
-def list_files(tmp_real: Path) -> list[tuple[str, int, float]]:
-    """(relpath, size, mtime) for every regular file under .ai/tmp, newest first."""
+def list_files(worktree: str) -> list[tuple[str, int, float]]:
+    """(relpath, size, mtime) for every regular file in this worktree's source
+    dirs, newest first. Relpaths are prefixed with their source key."""
     out: list[tuple[str, int, float]] = []
-    for dirpath, dirnames, filenames in os.walk(tmp_real, followlinks=False):
-        dirnames[:] = [d for d in dirnames if not d.startswith(".git")]
-        for fn in filenames:
-            full = Path(dirpath) / fn
-            try:
-                if not full.is_file():
-                    continue  # skips broken and dangling symlinks
-                st = full.stat()
-                rel = full.resolve().relative_to(tmp_real)
-            except (OSError, ValueError):
-                continue
-            out.append((str(rel), st.st_size, st.st_mtime))
+    for key, root_real in source_dirs_for(worktree).items():
+        for dirpath, dirnames, filenames in os.walk(root_real, followlinks=False):
+            dirnames[:] = [d for d in dirnames if not d.startswith(".git")]
+            for fn in filenames:
+                full = Path(dirpath) / fn
+                try:
+                    if not full.is_file():
+                        continue  # skips broken and dangling symlinks
+                    st = full.stat()
+                    rel = full.resolve().relative_to(root_real)
+                except (OSError, ValueError):
+                    continue
+                out.append((f"{key}/{rel}", st.st_size, st.st_mtime))
     out.sort(key=lambda r: r[2], reverse=True)
     return out
 
@@ -302,7 +330,7 @@ def sidebar_html(active: str | None) -> str:
     wts = list_worktrees()
     if wts:
         rows.append('<h1 style="margin-top:22px">Worktrees</h1>')
-    for name, _tmp, count, _newest in wts:
+    for name, count, _newest in wts:
         cls = "wt active" if name == active else "wt"
         rows.append(
             f'<a class="{cls}" href="/w/{q(name)}">'
@@ -315,7 +343,11 @@ def sidebar_html(active: str | None) -> str:
 def file_rows(entries: list[tuple[str, str, int, float]]) -> str:
     """entries: (worktree, relpath, size, mtime)."""
     if not entries:
-        return '<p class="empty">Nothing here yet. Files Claude writes to <code>.ai/tmp/</code> show up automatically.</p>'
+        return (
+            '<p class="empty">Nothing here yet. Files Claude writes to '
+            "<code>.ai/tmp/</code> or <code>.ai/scratchpads/</code> "
+            "show up automatically.</p>"
+        )
     out = ['<table class="files">']
     for wt, rel, size, mtime in entries:
         kind = kind_of(rel)
@@ -542,8 +574,8 @@ class Handler(BaseHTTPRequestHandler):
     # -- pages ------------------------------------------------------------
     def view_index(self):
         entries: list[tuple[str, str, int, float]] = []
-        for name, tmp, _count, _newest in list_worktrees():
-            for rel, size, mtime in list_files(tmp):
+        for name, _count, _newest in list_worktrees():
+            for rel, size, mtime in list_files(name):
                 entries.append((name, rel, size, mtime))
         entries.sort(key=lambda r: r[3], reverse=True)
         shown = entries[:60]
@@ -554,12 +586,13 @@ class Handler(BaseHTTPRequestHandler):
         self._send(page(TITLE, body, sidebar_html(None)), "text/html; charset=utf-8")
 
     def view_worktree(self, worktree: str):
-        tmp = tmp_dir_for(worktree)
-        if tmp is None:
+        sources = source_dirs_for(worktree)
+        if not sources:
             return self._error(HTTPStatus.NOT_FOUND, "No such worktree")
-        entries = [(worktree, rel, size, mtime) for rel, size, mtime in list_files(tmp)]
+        entries = [(worktree, rel, size, mtime) for rel, size, mtime in list_files(worktree)]
+        crumb = " · ".join("/".join(SOURCE_DIRS[k]) for k in sources)
         body = (
-            f'<div class="crumb">.ai/tmp</div>'
+            f'<div class="crumb">{html.escape(crumb)}</div>'
             f'<h2 class="title">{html.escape(worktree)}</h2>{file_rows(entries)}'
         )
         self._send(
@@ -568,10 +601,7 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def view_file(self, worktree: str, rel: str):
-        tmp = tmp_dir_for(worktree)
-        if tmp is None:
-            return self._error(HTTPStatus.NOT_FOUND, "No such worktree")
-        target = resolve_within(tmp, rel)
+        target = resolve_file(worktree, rel)
         if target is None:
             return self._error(HTTPStatus.NOT_FOUND, "No such file")
 
@@ -626,10 +656,7 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def serve_raw(self, worktree: str, rel: str, download: bool):
-        tmp = tmp_dir_for(worktree)
-        if tmp is None:
-            return self._error(HTTPStatus.NOT_FOUND, "No such worktree")
-        target = resolve_within(tmp, rel)
+        target = resolve_file(worktree, rel)
         if target is None:
             return self._error(HTTPStatus.NOT_FOUND, "No such file")
 

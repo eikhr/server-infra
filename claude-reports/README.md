@@ -1,8 +1,9 @@
 # claude-reports
 
-Read-only web browser for the scratch files Claude writes to `.ai/tmp/` in each
-Atlas worktree, so an HTML plan report or markdown doc generated over SSH can be
-opened in a real browser without `scp` or a port-forward.
+Read-only web browser for the scratch files Claude writes to `.ai/tmp/` and
+`.ai/scratchpads/` in each Atlas worktree, so an HTML plan report or markdown
+doc generated over SSH can be opened in a real browser without `scp` or a
+port-forward.
 
 Live at **https://reports.eikhr.no** — behind the same Traefik `myauth`
 basicauth as the Traefik dashboard (user `eik`, credentials in
@@ -11,15 +12,23 @@ basicauth as the Traefik dashboard (user `eik`, credentials in
 ## What it exposes
 
 The container mounts `~/code/atlas/worktrees` **read-only**, but the app only
-ever serves `<worktree>/.ai/tmp/**`. Source code, `.env` files, and everything
+ever serves the source dirs listed in `SOURCE_DIRS` — `<worktree>/.ai/tmp/**`
+and `<worktree>/.ai/scratchpads/**`. Source code, `.env` files, and everything
 else in the checkouts are unreachable:
 
 - worktree names must be a single path component directly under the root;
-- `.ai/tmp` must resolve to a path *inside* its own worktree (a symlinked
-  `.ai/tmp` is rejected);
-- every requested file is `realpath`'d and re-checked for containment, so
-  neither `..` nor a symlink planted inside `.ai/tmp` can escape;
+- each source dir must resolve to a path *inside* its own worktree (a symlinked
+  `.ai/tmp` or `.ai/scratchpads` is rejected);
+- a file's URL names its source dir up front (`/v/<worktree>/tmp/report.html`,
+  `/v/<worktree>/scratchpads/design.md`); an unknown key is a 404, and a known
+  one is only ever joined against that dir;
+- every requested file is `realpath`'d and re-checked for containment against
+  that one source dir, so neither `..` nor a symlink planted inside it can
+  escape;
 - directory walks use `followlinks=False`.
+
+Prefixing the relpath with the source key also keeps the two namespaces from
+colliding, so a `design.md` in each shows up as two distinct files.
 
 Worktrees are scanned per request, so ones created or removed by
 `claude-remote/worktree-create.sh` appear and disappear on their own.
@@ -68,5 +77,6 @@ user can traverse into it.
 ## Changing the served root
 
 Point it somewhere else by editing the bind mount and `WORKTREES_ROOT` in
-`docker-compose.yml`. The app assumes the layout `<root>/<name>/.ai/tmp`; to
-serve a different subdirectory, change `TMP_PARTS` in `app.py`.
+`docker-compose.yml`. The app assumes the layout `<root>/<name>/<source-dir>`;
+to serve different subdirectories, edit `SOURCE_DIRS` in `app.py`. Adding an
+entry is free; renaming a key changes the URLs of every file under it.
