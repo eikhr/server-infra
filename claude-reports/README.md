@@ -28,7 +28,7 @@ Worktrees are scanned per request, so ones created or removed by
 
 | Type | How |
 | --- | --- |
-| `.md` | python-markdown (`extra`, `toc`, `admonition`, `codehilite`) |
+| `.md` | python-markdown (`extra`, `toc`, `admonition`, `codehilite`) + mermaid |
 | `.html` | sandboxed iframe — scripts run, but on an opaque origin so they can't touch the parent page |
 | code / text | Pygments, light and dark themes |
 | images, PDF | inline |
@@ -36,8 +36,22 @@ Worktrees are scanned per request, so ones created or removed by
 
 Files over 4 MB are offered as a download instead of rendered.
 
-Markdown ```mermaid blocks render as plain code — the renderer has no mermaid
-support. HTML reports that embed their own mermaid still work.
+### Mermaid
+
+` ```mermaid ` fences (and `~~~mermaid`) render as diagrams, following the
+browser's light/dark preference and re-drawing if it changes.
+
+`MermaidPreprocessor` intercepts the fence at priority 27 — above `fenced_code`
+(25), which would otherwise fold the block into a highlighted `<pre>` and lose
+the language marker. The source is stashed as raw HTML so nothing downstream
+touches it. Unterminated fences are left for markdown to handle rather than
+swallowing the rest of the document.
+
+mermaid.js is vendored into the image at build time (pinned version, checksum
+verified) and served from `/static/`, so pages have no external dependency at
+view time. To bump it, change `MERMAID_VERSION` **and** `MERMAID_SHA256` in the
+Dockerfile — the build fails loudly if they disagree. The UMD bundle is
+deliberate: the ESM build is small but lazily imports the rest of `dist/`.
 
 ## Operating
 

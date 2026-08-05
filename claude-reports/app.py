@@ -12,6 +12,8 @@ from __future__ import annotations
 import html
 import mimetypes
 import os
+import re
+import textwrap
 import time
 import urllib.parse
 from datetime import datetime, timezone
@@ -20,6 +22,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import markdown
+from markdown.extensions import Extension
+from markdown.preprocessors import Preprocessor
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_for_filename
@@ -29,6 +33,7 @@ ROOT = Path(os.environ.get("WORKTREES_ROOT", "/worktrees")).resolve()
 TMP_PARTS = (".ai", "tmp")
 PORT = int(os.environ.get("PORT", "8080"))
 TITLE = os.environ.get("SITE_TITLE", "Claude reports")
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 # Anything larger is offered as a download rather than rendered inline.
 MAX_INLINE_BYTES = 4 * 1024 * 1024
@@ -239,6 +244,15 @@ table.files td.meta { color: var(--fg-dim); font-size: 13px; white-space: nowrap
 .doc th, .doc td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
 .doc blockquote { border-left: 3px solid var(--border); margin-left: 0; padding-left: 14px; color: var(--fg-dim); }
 .doc h1, .doc h2 { border-bottom: 1px solid var(--border); padding-bottom: .3em; }
+.doc .mermaid {
+  margin: 20px 0; padding: 16px; text-align: center;
+  background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px;
+  overflow-x: auto;
+}
+/* Pre-render the source is hidden; only the generated <svg> should show. */
+.doc .mermaid:not([data-processed]) { color: var(--fg-dim); font-family: ui-monospace, monospace;
+  white-space: pre; text-align: left; font-size: 13px; }
+.doc .mermaid svg { max-width: 100%; height: auto; }
 .viewbar {
   display: flex; gap: 14px; align-items: center; margin-bottom: 18px;
   padding-bottom: 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap;
@@ -264,7 +278,7 @@ def pygments_css() -> str:
     return f"{light}\n@media (prefers-color-scheme: dark) {{\n{dark}\n}}\n"
 
 
-def page(title: str, body: str, sidebar: str) -> bytes:
+def page(title: str, body: str, sidebar: str, scripts: str = "") -> bytes:
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
@@ -277,6 +291,7 @@ def page(title: str, body: str, sidebar: str) -> bytes:
 <nav class="side">{sidebar}</nav>
 <main class="main">{body}</main>
 </div>
+{scripts}
 </body></html>""".encode("utf-8")
 
 
@@ -323,12 +338,98 @@ def file_rows(entries: list[tuple[str, str, int, float]]) -> str:
 # Views
 # --------------------------------------------------------------------------
 
-def render_markdown(text: str) -> str:
+MERMAID_OPEN = re.compile(r"^(?P<indent>[ ]{0,3})(?P<fence>`{3,}|~{3,})[ ]*mermaid[ ]*$", re.IGNORECASE)
+
+
+class MermaidPreprocessor(Preprocessor):
+    """Stash ```mermaid fences as raw HTML before fenced_code/codehilite run.
+
+    Those would otherwise fold the block into a highlighted <pre> and lose the
+    language marker, leaving nothing for mermaid.js to find. Registering above
+    them (priority 27 vs fenced_code's 25) means the diagram source never
+    reaches the normal code path.
+    """
+
+    def run(self, lines: list[str]) -> list[str]:
+        out: list[str] = []
+        i = 0
+        while i < len(lines):
+            match = MERMAID_OPEN.match(lines[i])
+            if not match:
+                out.append(lines[i])
+                i += 1
+                continue
+
+            fence = match.group("fence")
+            closer = re.compile(
+                r"^[ ]{0,3}" + re.escape(fence[0]) + "{" + str(len(fence)) + r",}[ ]*$"
+            )
+            body: list[str] = []
+            j = i + 1
+            closed = False
+            while j < len(lines):
+                if closer.match(lines[j]):
+                    closed = True
+                    j += 1
+                    break
+                body.append(lines[j])
+                j += 1
+
+            if not closed:
+                # Unterminated fence — leave it alone and let markdown decide.
+                out.append(lines[i])
+                i += 1
+                continue
+
+            source = textwrap.dedent("\n".join(body)).strip()
+            escaped = html.escape(source)
+            out.append(
+                self.md.htmlStash.store(
+                    f'<div class="mermaid" data-src="{escaped}">{escaped}</div>'
+                )
+            )
+            i = j
+        return out
+
+
+class MermaidExtension(Extension):
+    def extendMarkdown(self, md):  # noqa: N802 - markdown API
+        md.preprocessors.register(MermaidPreprocessor(md), "mermaid", 27)
+
+
+MERMAID_SCRIPT = """
+<script src="/static/mermaid.min.js"></script>
+<script>
+(function () {
+  if (typeof mermaid === "undefined") return;
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  function draw() {
+    document.querySelectorAll(".mermaid").forEach(function (el) {
+      el.textContent = el.getAttribute("data-src");
+      el.removeAttribute("data-processed");
+    });
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: mq.matches ? "dark" : "default",
+    });
+    mermaid.run({ querySelector: ".mermaid" });
+  }
+  draw();
+  mq.addEventListener("change", draw);
+})();
+</script>
+"""
+
+
+def render_markdown(text: str) -> tuple[str, bool]:
+    """Return (html, uses_mermaid)."""
     md = markdown.Markdown(
-        extensions=["extra", "toc", "sane_lists", "admonition", "codehilite"],
+        extensions=["extra", "toc", "sane_lists", "admonition", "codehilite", MermaidExtension()],
         extension_configs={"codehilite": {"guess_lang": False}},
     )
-    return md.convert(text)
+    rendered = md.convert(text)
+    return rendered, 'class="mermaid"' in rendered
 
 
 def render_code(text: str, filename: str) -> str:
@@ -361,13 +462,20 @@ class Handler(BaseHTTPRequestHandler):
         print(f"{self.address_string()} {fmt % args}", flush=True)
 
     # -- helpers ----------------------------------------------------------
-    def _send(self, body: bytes, ctype: str, status: int = 200, extra: dict | None = None):
+    def _send(
+        self,
+        body: bytes,
+        ctype: str,
+        status: int = 200,
+        extra: dict | None = None,
+        cache: str = "no-store",
+    ):
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", cache)
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         self.end_headers()
@@ -399,6 +507,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send((STYLE + pygments_css()).encode("utf-8"), "text/css; charset=utf-8")
             if segments[0] == "favicon.ico":
                 return self._send(b"", "image/x-icon", 404)
+            if segments[0] == "static" and len(segments) == 2:
+                return self.serve_static(segments[1])
             if segments[0] == "w" and len(segments) == 2:
                 return self.view_worktree(segments[1])
             if segments[0] in ("v", "raw", "dl") and len(segments) >= 3:
@@ -414,6 +524,20 @@ class Handler(BaseHTTPRequestHandler):
             return self._error(HTTPStatus.INTERNAL_SERVER_ERROR, "Something went wrong")
 
         return self._error(HTTPStatus.NOT_FOUND, "Not found")
+
+    def serve_static(self, name: str):
+        """Serve a vendored asset. Flat directory, exact filename only."""
+        if name not in ("mermaid.min.js",):
+            return self._error(HTTPStatus.NOT_FOUND, "Not found")
+        target = STATIC_DIR / name
+        if not target.is_file():
+            return self._error(HTTPStatus.NOT_FOUND, "Not found")
+        # Version-pinned at build time, so it can be cached hard.
+        self._send(
+            target.read_bytes(),
+            "application/javascript; charset=utf-8",
+            cache="public, max-age=31536000, immutable",
+        )
 
     # -- pages ------------------------------------------------------------
     def view_index(self):
@@ -467,6 +591,7 @@ class Handler(BaseHTTPRequestHandler):
             "</div>"
         )
 
+        scripts = ""
         if size > MAX_INLINE_BYTES and kind != "image":
             body = bar + (
                 f'<p class="empty">This file is {human_size(size)} — too large to render '
@@ -474,7 +599,10 @@ class Handler(BaseHTTPRequestHandler):
                 f'<a href="{raw_url}">open it raw</a>.</p>'
             )
         elif kind == "md":
-            body = bar + f'<article class="doc">{render_markdown(read_text(target))}</article>'
+            rendered, uses_mermaid = render_markdown(read_text(target))
+            body = bar + f'<article class="doc">{rendered}</article>'
+            if uses_mermaid:
+                scripts = MERMAID_SCRIPT
         elif kind == "html":
             body = bar + (
                 f'<iframe class="report" src="{raw_url}" '
@@ -493,7 +621,7 @@ class Handler(BaseHTTPRequestHandler):
             )
 
         self._send(
-            page(f"{Path(rel).name} — {TITLE}", body, sidebar_html(worktree)),
+            page(f"{Path(rel).name} — {TITLE}", body, sidebar_html(worktree), scripts),
             "text/html; charset=utf-8",
         )
 
