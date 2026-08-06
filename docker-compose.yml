@@ -6,7 +6,13 @@
 services:
 
   traefik:
-    image: traefik:v2.10
+    # Do not go back below v2.11. v2.10's docker provider pins API version 1.24,
+    # and the daemon's minimum is now 1.40, so the provider could not connect at
+    # all. That drops every docker-provided router while acme.json keeps serving
+    # valid certs — so all hosts 404 and it looks like the apps are broken, not
+    # the proxy. v2.11 negotiates the version, so no DOCKER_API_VERSION pin is
+    # needed (and a pin would just break again at the next minimum bump).
+    image: traefik:v2.11
     command:
       - "--api"
       - "--providers.docker"
