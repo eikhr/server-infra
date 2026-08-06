@@ -1,0 +1,17 @@
+[Unit]
+Description=Custom AMDGPU fan curve
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/amdgpu-fan-curve
+# Runs even when the main process was SIGKILLed (stop timeout, OOM), which the
+# in-process trap cannot cover. Without it a kill during idle would leave the
+# card pinned in manual mode at whatever PWM was last written, and a subsequent
+# load would heat the GPU with the fan near minimum until it throttled.
+ExecStopPost=/usr/local/bin/amdgpu-fan-curve --restore
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

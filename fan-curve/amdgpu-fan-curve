@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# Custom fan curve for the Navi 10 (RX 5700 XT / 5600 OEM) in eik-desktop.
+#
+# Manual control is held at all times, including idle. That is deliberate and
+# was measured, not assumed -- see README.md: this card has no zero-RPM stop, and
+# its firmware idles the fan at 20% / ~1194 RPM, whereas a manual pwm1=0 reaches
+# the hardware floor of ~701 RPM. Manual is therefore the quieter idle, and
+# handing low temps back to the firmware makes the machine louder, not silent.
+#
+# Deliberately not `set -e`: a transient sysfs read must not kill the controller
+# and leave the fan wherever it happened to be. Persistent failures exit
+# non-zero instead, so systemd's Restart=on-failure re-runs discovery.
+set -uo pipefail
+
+CURVE_ON=55      # at/above this junction temp the curve applies
+CURVE_OFF=52     # at/below this, drop back to the idle floor (hysteresis band)
+MAX_READ_FAIL=5  # consecutive read failures before giving up and restarting
+
+find_hwmon() {
+    local h
+    for h in /sys/class/hwmon/hwmon*; do
+        if [ -f "$h/name" ] && [ "$(cat "$h/name" 2>/dev/null)" = "amdgpu" ]; then
+            printf '%s' "$h"; return 0
+        fi
+    done
+    return 1
+}
+
+HWMON="$(find_hwmon)" || { echo "amdgpu hwmon not found" >&2; exit 1; }
+TEMP_FILE="$HWMON/temp2_input"     # temp2 = junction (hotspot), the one that matters
+PWM_FILE="$HWMON/pwm1"
+PWM_EN_FILE="$HWMON/pwm1_enable"
+
+# ExecStopPost hook: systemd runs it even when the main process was SIGKILLed
+# and the trap below never fired. Handing the card back to its firmware is the
+# right resting state for an unmanaged GPU -- louder at idle, but self-managing.
+if [ "${1:-}" = "--restore" ]; then
+    echo 2 > "$PWM_EN_FILE" 2>/dev/null || true
+    exit 0
+fi
+
+restore_auto() { echo 2 > "$PWM_EN_FILE" 2>/dev/null || true; }
+trap 'restore_auto; exit 0' TERM INT
+
+# Junction temp -> PWM. Continuous from (55,40) through (65,90) and (80,185) to
+# (90,255); the upper half is the original curve, unchanged. Below ~pwm 36 the
+# fan sits on its ~701 RPM floor regardless, so the bottom of the ramp is a dead
+# zone and idle just asks for 0.
+curve() {
+    local t=$1 p
+    if   [ "$t" -lt "$CURVE_ON" ]; then p=0
+    elif [ "$t" -lt 65 ]; then p=$((40 + (t - CURVE_ON) * 5))
+    elif [ "$t" -lt 80 ]; then p=$((90 + (t - 65) * 19 / 3))
+    elif [ "$t" -lt 90 ]; then p=$((185 + (t - 80) * 7))
+    else p=255
+    fi
+    [ "$p" -gt 255 ] && p=255
+    [ "$p" -lt 0 ] && p=0
+    printf '%s' "$p"
+}
+
+echo 1 > "$PWM_EN_FILE" 2>/dev/null
+ramping=0        # 1 once the curve has engaged, 0 while idling at the floor
+fails=0
+
+while true; do
+    raw="$(cat "$TEMP_FILE" 2>/dev/null)"
+    if [ -z "$raw" ]; then
+        fails=$((fails + 1))
+        if [ "$fails" -ge "$MAX_READ_FAIL" ]; then
+            echo "$TEMP_FILE unreadable ${fails}x; restoring auto and exiting" >&2
+            restore_auto
+            exit 1
+        fi
+        sleep 5
+        continue
+    fi
+    fails=0
+    T=$((raw / 1000))
+
+    # Hysteresis so a GPU hovering at the threshold cannot flap the fan.
+    if [ "$ramping" -eq 0 ] && [ "$T" -ge "$CURVE_ON" ]; then
+        ramping=1
+    elif [ "$ramping" -eq 1 ] && [ "$T" -le "$CURVE_OFF" ]; then
+        ramping=0
+    fi
+
+    # Re-assert on every pass. A GPU reset restores auto mode behind our back,
+    # after which pwm1 writes are silently ignored by the firmware -- the
+    # original script set this once at startup and could lose the curve with no
+    # error, no log, and the unit still showing as running.
+    cur_en="$(cat "$PWM_EN_FILE" 2>/dev/null)"
+    if [ "$cur_en" != "1" ]; then
+        echo "pwm1_enable was ${cur_en:-unreadable}, expected 1; re-asserting" >&2
+        echo 1 > "$PWM_EN_FILE" 2>/dev/null
+    fi
+
+    if [ "$ramping" -eq 1 ]; then
+        echo "$(curve "$T")" > "$PWM_FILE" 2>/dev/null
+    else
+        echo 0 > "$PWM_FILE" 2>/dev/null
+    fi
+
+    sleep 5
+done
