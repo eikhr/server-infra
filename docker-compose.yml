@@ -171,6 +171,43 @@ services:
       - "traefik.http.routers.claude-reports.tls.certresolver=myresolver"
       - "traefik.http.routers.claude-reports.middlewares=myauth@docker"
 
+  # Scrapes Entur for cheap weekend train tickets.
+  #
+  # Source is a private repo, so unlike www this cannot build from a git URL —
+  # that clone is unauthenticated. It builds from the checkout at
+  # /home/eik/code/entur-scraper, which fetches over a read-only deploy key
+  # (Host github-entur in ~/.ssh/config). To deploy:
+  #   git -C /home/eik/code/entur-scraper pull
+  #   docker compose build entur-scraper && docker compose up -d entur-scraper
+  #
+  # Behind the same basicauth as the Traefik dashboard — the refresh endpoints
+  # start headless-browser work, so they must not be reachable anonymously.
+  # See /home/eik/code/entur-scraper/README.md.
+  entur-scraper:
+    build:
+      context: /home/eik/code/entur-scraper
+    restart: unless-stopped
+    # Chromium spawns a process tree; without an init, node as PID 1 never
+    # reaps the children and defunct processes accumulate.
+    init: true
+    mem_limit: 2g
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      # Departure times are sent to Entur as timestamps built from local time.
+      # In a UTC container every search shifts an hour or two and the night
+      # train falls outside the window.
+      TZ: Europe/Oslo
+    volumes:
+      # config.json and the price cache. Must be uid 1000 on the host.
+      - ./data/entur-scraper:/app/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.entur-scraper.rule=Host(`entur.eikhr.no`)"
+      - "traefik.http.routers.entur-scraper.entrypoints=websecure"
+      - "traefik.http.routers.entur-scraper.tls.certresolver=myresolver"
+      - "traefik.http.routers.entur-scraper.middlewares=myauth@docker"
+
   minecraft:
     image: itzg/minecraft-server
     ports:
