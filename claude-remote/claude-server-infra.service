@@ -1,0 +1,25 @@
+[Unit]
+Description=Claude Code Remote Control (server-infra)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/server-infra
+# systemd does not read shell init, so PATH is spelled out. /usr/bin carries
+# docker and systemctl; ~/.nix-profile/bin is where the interactive shell finds
+# git, git-lfs and yq, so the daemon sees the same toolchain the user does.
+Environment=PATH=%h/.nix-profile/bin:%h/.bun/bin:%h/.local/share/fnm/aliases/default/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=%h
+# same-dir, not worktree: docker-compose.yml is only meaningful next to the
+# ./data bind-mount targets and .env, both of which are gitignored and so absent
+# from any worktree. Sessions here edit and apply the live checkout.
+ExecStart=%h/.local/bin/claude remote-control --spawn same-dir --name server-infra --permission-mode auto --capacity 2
+Restart=always
+RestartSec=10
+# Shares 12 cores with Home Assistant and the warehouse/groupup stacks; image
+# builds started from a session should not starve them.
+Nice=10
+
+[Install]
+WantedBy=default.target

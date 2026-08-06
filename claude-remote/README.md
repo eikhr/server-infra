@@ -1,25 +1,51 @@
 # Claude Code Remote Control on eik-desktop
 
-Runs Claude Code sessions against the atlas monorepo, controllable from the Claude
-mobile app. Relays through Anthropic's API over outbound HTTPS — no inbound port,
-no tunnel, works on cellular.
+Runs Claude Code sessions on this box, controllable from the Claude mobile app.
+Relays through Anthropic's API over outbound HTTPS — no inbound port, no tunnel,
+works on cellular.
+
+Two daemons, one per repo. Each shows up separately in the app:
+
+| Unit | Repo | Spawn | Sessions |
+| --- | --- | --- | --- |
+| `claude-atlas.service` | ~/code/atlas/worktrees/main | `worktree` | isolated, warmed worktree each |
+| `claude-server-infra.service` | ~/server-infra | `same-dir` | share the live checkout, max 2 |
 
 ## Operations
 
-    systemctl --user status claude-atlas.service
-    journalctl --user -u claude-atlas.service -f
-    systemctl --user restart claude-atlas.service
+    systemctl --user status claude-atlas.service claude-server-infra.service
+    journalctl --user -u claude-server-infra.service -f
+    systemctl --user restart claude-server-infra.service
 
-Lingering is enabled (`loginctl show-user eik -p Linger`), so the daemon survives
+Lingering is enabled (`loginctl show-user eik -p Linger`), so the daemons survive
 logout. Reboot survival is deliberately unverified — this box also runs Home
 Assistant and the warehouse/groupup stacks, so it was not rebooted to test.
 
+## Why server-infra is same-dir, not worktree
+
+`docker-compose.yml` only means anything next to the things it references, and
+those are exactly the things git does not carry: `./data` holds every bind-mount
+target, and `.env` plus `vaultwarden.env` are gitignored secrets. A worktree copy
+would come up with empty volumes and missing credentials, so a session in one
+could edit the stack but never run it.
+
+The cost is that concurrent sessions share one working tree — two agents editing
+`docker-compose.yml` at once will clobber each other, and two running
+`docker compose up -d` at once will fight over the same containers. `--capacity 2`
+keeps that to a pair rather than the default 32; treat the second slot as "read
+logs while the first one works", not as parallel editing.
+
+Permission mode is `auto`, same as atlas — deliberately not `bypassPermissions`.
+These sessions can reach Vaultwarden's data and the whole docker socket, and a
+prompt on the phone is cheap next to an unattended `docker compose down -v`.
+
 ## Layout
 
-- Repo:     ~/code/atlas/worktrees/main
-- Sessions: ~/code/atlas/worktrees/rc-MMDD-HHMM-XXXXXX (created by the hook)
+- Repos:    ~/code/atlas/worktrees/main, ~/server-infra
+- Sessions: ~/code/atlas/worktrees/rc-MMDD-HHMM-XXXXXX (atlas, created by the hook)
 - Hooks:    ~/server-infra/claude-remote/worktree-create.sh, worktree-remove.sh
-- Unit:     ~/.config/systemd/user/claude-atlas.service
+- Units:    ~/.config/systemd/user/claude-{atlas,server-infra}.service, copied
+            from this directory — edit here, copy over, `daemon-reload`
 
 ## What the create hook does
 
@@ -80,3 +106,11 @@ worktree.log records every create/remove.
   inherit trust from the parent checkout, so trusting main covers every rc-* tree.
 - atlas-cli lives outside the pnpm workspace globs, so it needs
   `pnpm install --ignore-workspace`, and it requires bun.
+- The WorktreeCreate hook is registered globally in ~/.claude/settings.json but
+  hardcodes `TREES=~/code/atlas/worktrees` and pnpm warming. It only stays
+  correct because server-infra runs same-dir, where the hook never fires. Any
+  future worktree-mode daemon on another repo needs the hook taught about it
+  first, or it will drop that repo's worktrees into the atlas tree directory.
+- claude-reports mounts only ~/code/atlas/worktrees, so `.ai/tmp` files written
+  by a server-infra session are not browsable at reports.eikhr.no. Add a second
+  read-only mount there if that becomes annoying.
