@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { margin: 0; background: #F6F1E7; }
+.min-h-screen { background-image: radial-gradient(#92774d12 .7px, transparent .7px); background-size: 6px 6px; }
+.calculator { padding-top: 26px; }
+.bakery-mark { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 18px; }
+.bakery-mark svg { width: 112px; height: 72px; transform: rotate(-7deg); }
+.bakery-mark span { color: #79512F; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .15em; }
+.calculator h1 { text-align: center; font-size: clamp(1.8rem, 7vw, 2.35rem); line-height: 1.1; font-weight: 800 !important; letter-spacing: -.045em !important; }
+.calculator h1 + p { text-align: center; line-height: 1.6; max-width: 34ch; margin: 0 auto 30px; }
+.calculator h2 { font-size: .78rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.calculator input { font-variant-numeric: tabular-nums; padding-right: 16px; background: #FFFDF7; appearance: textfield; }
+.calculator input::-webkit-inner-spin-button, .calculator input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.calculator button { font-weight: 600; }
+.calculator button:not(:disabled) { cursor: pointer; }
+.calculator button:not(:disabled):hover { filter: brightness(.94); }
+.calculator :is(button,input,select):focus-visible { outline: 3px solid #A85E25; outline-offset: 3px; box-shadow: none; }
+.add-flour { background: #79512F !important; }
+.feel-selector { border: 1px solid #D8CBB5; }
+.results { position: relative; padding: 24px; background: #FFFDF7; border: 1px solid #D8CBB5; border-top: 4px solid #B98542; border-radius: 3px 3px 12px 3px; box-shadow: 4px 5px 0 #E8DECC; }
+.results h2 { color: #79512F; }
+.results .tabular-nums { font-variant-numeric: tabular-nums; }
+.results > .mt-4.pt-3 { border-top-style: dashed !important; }
+@media (max-width: 420px) {
+  .results { padding: 20px 16px; margin-left: -4px; margin-right: -4px; }
+  .calculator input { width: 5rem; }
+}

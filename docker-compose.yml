@@ -205,3 +205,16 @@ services:
     restart: unless-stopped
     volumes:
       - ./data/minecraft:/data
+
+  sourdough:
+    build: ./sourdough
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sourdough.rule=Host(`www.eikhr.no`) && (Path(`/sourdough`) || PathPrefix(`/sourdough/`))"
+      - "traefik.http.routers.sourdough.entrypoints=websecure"
+      - "traefik.http.routers.sourdough.tls.certresolver=myresolver"
+      - "traefik.http.routers.sourdough.priority=20"
+      - "traefik.http.services.sourdough.loadbalancer.server.port=80"
