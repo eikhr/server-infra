@@ -194,6 +194,50 @@ services:
       - "traefik.http.routers.entur-scraper.tls.certresolver=myresolver"
       - "traefik.http.routers.entur-scraper.middlewares=myauth@docker"
 
+  # Garmin Connect over MCP, reachable as a Claude custom connector (so it works
+  # in mobile chats — Anthropic's cloud dials in, not the phone). Its HTTP
+  # transport does no auth of its own, so the router gates it twice: Anthropic's
+  # published outbound range, plus a secret path prefix from GARMIN_MCP_PATH
+  # that Traefik strips. Tokens in data/garmin-mcp are bearer credentials for
+  # the whole Garmin account; mint them with
+  #   docker compose run --rm -it --entrypoint garmin-mcp-auth garmin-mcp
+  # then `docker compose up -d garmin-mcp`. The refresh token expires if left unused for a
+  # few weeks, so the healthcheck makes a real tool call to keep it rotating.
+  garmin-mcp:
+    build: https://github.com/Taxuspt/garmin_mcp.git
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      GARMIN_MCP_TRANSPORT: streamable-http
+      # Not 127.0.0.1: on loopback the MCP SDK auto-enables DNS-rebinding
+      # protection, which rejects the Host header Traefik forwards.
+      GARMIN_MCP_HOST: 0.0.0.0
+      GARMIN_MCP_PORT: 8000
+      # The server exposes 110+ tools; every one costs context in every chat.
+      # Dropped get_training_status/get_training_readiness/get_hrv_data: the
+      # watch doesn't record them, so they only returned empty results.
+      GARMIN_ENABLED_TOOLS: "get_activities,get_activity,get_stats,get_steps_data,get_heart_rates,get_sleep_data,get_stress_summary,get_body_battery"
+      TZ: Europe/Oslo
+    volumes:
+      - ./data/garmin-mcp:/root/.garminconnect
+      - ./garmin-mcp/keepalive.py:/keepalive.py:ro
+    healthcheck:
+      test: ["CMD", "python3", "/keepalive.py"]
+      interval: 6h
+      timeout: 60s
+      start_period: 1m
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.garmin-mcp.rule=Host(`garmin.eikhr.no`) && PathPrefix(`/${GARMIN_MCP_PATH}`)"
+      - "traefik.http.routers.garmin-mcp.entrypoints=websecure"
+      - "traefik.http.routers.garmin-mcp.tls.certresolver=myresolver"
+      - "traefik.http.routers.garmin-mcp.middlewares=garmin-path,anthropic-only"
+      - "traefik.http.middlewares.garmin-path.stripprefix.prefixes=/${GARMIN_MCP_PATH}"
+      # https://platform.claude.com/docs/en/api/ip-addresses
+      - "traefik.http.middlewares.anthropic-only.ipallowlist.sourcerange=160.79.104.0/21"
+      - "traefik.http.services.garmin-mcp.loadbalancer.server.port=8000"
+
   minecraft:
     image: itzg/minecraft-server
     ports:
