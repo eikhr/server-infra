@@ -238,18 +238,6 @@ services:
       - "traefik.http.middlewares.anthropic-only.ipallowlist.sourcerange=160.79.104.0/21"
       - "traefik.http.services.garmin-mcp.loadbalancer.server.port=8000"
 
-  minecraft:
-    image: itzg/minecraft-server
-    ports:
-      - 25565:25565
-    environment:
-      EULA: "TRUE"
-    tty: true
-    stdin_open: true
-    restart: unless-stopped
-    volumes:
-      - ./data/minecraft:/data
-
   sourdough:
     build: ./sourdough
     restart: unless-stopped
