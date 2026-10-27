@@ -32,3 +32,17 @@ body { margin: 0; background: #F6F1E7; }
 .lang-switch button { font-weight: 600; letter-spacing: .08em; }
 .method h2 { color: #79512F; }
 .method li::marker { color: #A85E25; }
+.flour-row { display: flex; align-items: center; gap: 8px; }
+.flour-row select { flex: 1 1 0; }
+.stepper input { border: 0 !important; border-left: 1px solid #D8CBB5 !important; border-right: 1px solid #D8CBB5 !important; border-radius: 0 !important; height: auto !important; width: 5.5rem !important; padding: 0 18px 0 6px !important; }
+.stepper .relative { display: flex; }
+.calculator .stepper-btn { font-weight: 500; transition: background .12s; }
+.calculator .stepper-btn:hover, .calculator .stepper-btn:active { background: #EFE6D6; filter: none; }
+.calculator .stepper :is(button, input):focus-visible { outline-offset: -3px; }
+@media (max-width: 520px) {
+  .flour-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) 40px; column-gap: 8px; row-gap: 6px; }
+  .flour-row .stepper { grid-column: 2; grid-row: 2; }
+  .flour-row .stepper .relative { flex: 1; }
+  .flour-row .stepper input { width: 100% !important; }
+  .flour-row .remove { grid-column: 3; grid-row: 1; }
+}

@@ -43,6 +43,8 @@ const STRINGS = {
     flourType: "Flour type",
     amount: (name) => `${name} amount`,
     removeFlour: "Remove flour",
+    less: (g) => `${g} g less`,
+    more: (g) => `${g} g more`,
     addFlour: "Add a flour",
     feelHeading: "How should the dough feel?",
     feels: { firmer: "Firmer", standard: "Standard", slack: "Slack" },
@@ -62,8 +64,6 @@ const STRINGS = {
     oatNote: "Oat flour has no gluten. Keep it to about 20% of the flour, or the loaf gets dense.",
     recipes: "Start from a recipe",
     method: "Method",
-    totalHint: "Change it to scale everything",
-    flourHint: "change to scale",
   },
   no: {
     title: "Surdeigskalkulator",
@@ -73,6 +73,8 @@ const STRINGS = {
     flourType: "Meltype",
     amount: (name) => `Mengde ${name.toLowerCase()}`,
     removeFlour: "Fjern mel",
+    less: (g) => `${g} g mindre`,
+    more: (g) => `${g} g mer`,
     addFlour: "Legg til mel",
     feelHeading: "Hvordan skal deigen kjennes?",
     feels: { firmer: "Fastere", standard: "Standard", slack: "Løsere" },
@@ -92,8 +94,6 @@ const STRINGS = {
     oatNote: "Havremel har ikke gluten. Hold det til rundt 20 % av melet, ellers blir brødet kompakt.",
     recipes: "Start fra en oppskrift",
     method: "Fremgangsmåte",
-    totalHint: "Endre for å skalere alt",
-    flourHint: "endre for å skalere",
   },
 };
 
@@ -214,6 +214,28 @@ function initialLang() {
 
 let nextId = 3;
 
+// −/+ buttons around an amount, so phones rarely need the number keyboard
+function Stepper({ step, onStep, t, children }) {
+  const btn = (dir, label, text) => (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={() => onStep(dir * step)}
+      className="stepper-btn w-10 self-stretch text-xl leading-none shrink-0 focus:outline-none focus-visible:ring-2"
+      style={{ color: ink, ...sans }}
+    >
+      {text}
+    </button>
+  );
+  return (
+    <div className="stepper flex items-stretch h-12 shrink-0 rounded-md overflow-hidden" style={{ background: crustLight, border: `1px solid ${crustLine}` }}>
+      {btn(-1, t.less(step), "−")}
+      {children}
+      {btn(1, t.more(step), "+")}
+    </div>
+  );
+}
+
 function GramsInput({ value, onChange, ariaLabel, wide }) {
   return (
     <div className="relative shrink-0">
@@ -251,7 +273,7 @@ function TotalInput({ value, onCommit, ariaLabel }) {
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-        className="w-28 h-11 text-center text-lg rounded-md bg-transparent focus:outline-none focus-visible:ring-2"
+        className="w-24 h-12 text-center text-lg rounded-md bg-transparent focus:outline-none focus-visible:ring-2"
         style={{ color: ink, border: `1px solid ${crustLine}`, ...display }}
       />
       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm pointer-events-none" style={{ color: inkSoft }}>g</span>
@@ -410,26 +432,28 @@ export default function SourdoughCalculator() {
           <h2 className="text-xl" style={display}>{t.yourFlour}</h2>
           <div className="mt-1">
             {flours.map((f, i) => (
-              <div key={f.id} className="flex items-center gap-2 py-2" style={{ borderBottom: `1px solid ${crustLine}` }}>
+              <div key={f.id} className="flour-row py-2" style={{ borderBottom: `1px solid ${crustLine}` }}>
                 <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: flourTones[i % flourTones.length] }} />
                 <select
                   value={f.type}
                   aria-label={t.flourType}
                   onChange={(e) => updateFlour(f.id, { type: e.target.value })}
-                  className="flex-1 min-w-0 h-12 px-2 rounded-md focus:outline-none focus-visible:ring-2"
+                  className="flex-1 min-w-0 w-full h-12 px-2 rounded-md focus:outline-none focus-visible:ring-2"
                   style={{ background: crustLight, color: ink, border: `1px solid ${crustLine}`, ...sans }}
                 >
                   {FLOUR_TYPES.map((ft) => (
                     <option key={ft.key} value={ft.key}>{ft.name[lang]}</option>
                   ))}
                 </select>
-                <GramsInput ariaLabel={t.amount(byKey[f.type].name[lang])} value={f.grams} onChange={(g) => updateFlour(f.id, { grams: g })} />
+                <Stepper step={100} t={t} onStep={(d) => updateFlour(f.id, { grams: Math.max(0, (f.grams || 0) + d) })}>
+                  <GramsInput ariaLabel={t.amount(byKey[f.type].name[lang])} value={f.grams} onChange={(g) => updateFlour(f.id, { grams: g })} />
+                </Stepper>
                 <button
                   type="button"
                   aria-label={t.removeFlour}
                   onClick={() => removeFlour(f.id)}
                   disabled={flours.length === 1}
-                  className="w-10 h-12 rounded-md text-lg disabled:opacity-30 focus:outline-none focus-visible:ring-2"
+                  className="remove w-10 h-12 rounded-md text-lg disabled:opacity-30 focus:outline-none focus-visible:ring-2"
                   style={{ color: inkSoft }}
                 >
                   ×
@@ -487,9 +511,10 @@ export default function SourdoughCalculator() {
               <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: flourTones[0] }} />
               <span className="flex-1 min-w-0" style={{ color: ink, ...sans }}>
                 {t.flour}
-                <span className="ml-2 text-xs" style={{ color: inkSoft }}>{t.flourHint}</span>
               </span>
-              <TotalInput ariaLabel={t.flour} value={r.addedFlour} onCommit={scaleFlourTo} />
+              <Stepper step={100} t={t} onStep={(d) => r.addedFlour + d > 0 && scaleFlourTo(r.addedFlour + d)}>
+                <TotalInput ariaLabel={t.flour} value={r.addedFlour} onCommit={scaleFlourTo} />
+              </Stepper>
             </div>
             <Row swatch={waterBlue} name={t.water} grams={Math.max(0, r.waterAdd)} />
             <div className="flex items-center gap-3 py-2">
@@ -497,19 +522,21 @@ export default function SourdoughCalculator() {
               <span className="flex-1 min-w-0" style={{ color: ink, ...sans }}>
                 {t.starter}
                 {starterOverride === null ? (
-                  <span className="ml-2 text-xs" style={{ color: inkSoft }}>{t.starterAuto}</span>
+                  <span className="block text-xs" style={{ color: inkSoft }}>{t.starterAuto}</span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setStarterOverride(null)}
-                    className="ml-2 text-xs underline focus:outline-none focus-visible:ring-2 rounded"
+                    className="block text-xs underline focus:outline-none focus-visible:ring-2 rounded"
                     style={{ color: starterGold }}
                   >
                     {t.backToAuto}
                   </button>
                 )}
               </span>
-              <GramsInput ariaLabel={t.starterAmount} value={r.starter} onChange={(g) => setStarterOverride(g)} />
+              <Stepper step={10} t={t} onStep={(d) => setStarterOverride(Math.max(0, r.starter + d))}>
+                <GramsInput ariaLabel={t.starterAmount} value={r.starter} onChange={(g) => setStarterOverride(g)} />
+              </Stepper>
             </div>
             <Row swatch={saltGrey} name={t.salt} grams={r.salt} note={t.saltNote} decimals={1} />
           </div>
@@ -522,9 +549,10 @@ export default function SourdoughCalculator() {
             <div className="flex items-center justify-between gap-3 pt-2" style={{ color: ink }}>
               <span>
                 {t.totalDough}
-                <span className="block text-xs" style={{ color: inkSoft }}>{t.totalHint}</span>
               </span>
-              <TotalInput ariaLabel={t.totalDough} value={r.total} onCommit={scaleTotalTo} />
+              <Stepper step={100} t={t} onStep={(d) => r.total + d > 0 && scaleTotalTo(r.total + d)}>
+                <TotalInput ariaLabel={t.totalDough} value={r.total} onCommit={scaleTotalTo} />
+              </Stepper>
             </div>
           </div>
 
