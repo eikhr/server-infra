@@ -51,7 +51,7 @@ const STRINGS = {
     flour: "Flour",
     water: "Water",
     starter: "Starter",
-    starterAuto: "20% of your flour",
+    starterAuto: "10% of your flour",
     backToAuto: "Back to automatic",
     starterAmount: "Starter amount",
     salt: "Salt",
@@ -81,7 +81,7 @@ const STRINGS = {
     flour: "Mel",
     water: "Vann",
     starter: "Surdeig",
-    starterAuto: "20 % av melet",
+    starterAuto: "10 % av melet",
     backToAuto: "Tilbake til automatisk",
     starterAmount: "Mengde surdeig",
     salt: "Salt",
@@ -97,30 +97,28 @@ const STRINGS = {
   },
 };
 
-// Short tin-loaf method; recipes override the steps that differ
+// Evening-to-morning tin-loaf method; recipes override the steps that differ
 const TIN = {
   en: {
-    mix: "Mix flour and water, rest 30–60 min",
-    add: "Add starter and salt",
-    folds: "3 stretch and folds, 30 min apart",
-    bulk: "Rise by about a third, 3–5 h",
-    shape: "Shape and put in a greased tin",
-    proof: "Fridge overnight, or 1–2 h at room temp",
-    bake: "Bake at 230 °C for 45–50 min",
+    mix: "17–18: mix flour, water, starter and salt",
+    folds: "3–5 stretch and folds through the evening",
+    bulk: "Leave on the counter overnight; by morning it should have grown by a third to a half",
+    shape: "Morning: shape and put in a greased tin",
+    proof: "Bake after 1–2 h, or keep in the fridge and bake after work",
+    bake: "230 °C for 45–50 min (5 min more straight from the fridge)",
     rest: "Cool 2 h before cutting",
   },
   no: {
-    mix: "Bland mel og vann, hvil 30–60 min",
-    add: "Tilsett surdeig og salt",
-    folds: "Strekk og brett 3 ganger, hvert 30. min",
-    bulk: "Hev til en tredjedel større, 3–5 t",
-    shape: "Form og legg i smurt brødform",
-    proof: "Kjøleskap over natten, eller 1–2 t i romtemperatur",
-    bake: "Stek på 230 °C i 45–50 min",
+    mix: "Kl. 17–18: bland mel, vann, surdeig og salt",
+    folds: "Strekk og brett 3–5 ganger utover kvelden",
+    bulk: "La stå på benken over natten; om morgenen skal den ha vokst med en tredjedel til halvparten",
+    shape: "Morgen: form og legg i smurt brødform",
+    proof: "Stek etter 1–2 t, eller sett i kjøleskapet og stek etter jobb",
+    bake: "230 °C i 45–50 min (5 min ekstra rett fra kjøleskapet)",
     rest: "Avkjøl 2 t før du skjærer",
   },
 };
-const ORDER = ["mix", "add", "folds", "bulk", "shape", "topping", "proof", "bake", "rest"];
+const ORDER = ["mix", "folds", "bulk", "shape", "topping", "proof", "bake", "rest"];
 const tin = (o = {}) =>
   Object.fromEntries(
     ["en", "no"].map((l) => [l, ORDER.map((k) => o[k]?.[l] ?? TIN[l][k]).filter((step) => step != null)]),
@@ -139,7 +137,7 @@ const RECIPES = [
     name: { en: "Three-way loaf", no: "Tredelt grovbrød" },
     flours: [["ap", 167], ["ww", 167], ["rye", 166]],
     feel: "standard",
-    steps: tin({ folds: { en: "2 stretch and folds with wet hands, 30 min apart", no: "Strekk og brett 2 ganger med våte hender, hvert 30. min" } }),
+    steps: tin({ folds: { en: "2–3 stretch and folds with wet hands through the evening", no: "Strekk og brett 2–3 ganger med våte hender utover kvelden" } }),
   },
   {
     key: "extra",
@@ -161,8 +159,8 @@ const RECIPES = [
     flours: [["spelt", 200], ["wspelt", 300]],
     feel: "firmer",
     steps: tin({
-      folds: { en: "2 gentle stretch and folds, 30 min apart", no: "Strekk og brett forsiktig 2 ganger, hvert 30. min" },
-      bulk: { en: "Rise by about a third, 3–4 h; don't overdo it", no: "Hev til en tredjedel større, 3–4 t; ikke for lenge" },
+      folds: { en: "2–3 gentle stretch and folds through the evening", no: "Strekk og brett forsiktig 2–3 ganger utover kvelden" },
+      bulk: { en: "Leave on the counter overnight; spelt overproofs easily, so a third is plenty", no: "La stå på benken over natten; spelt overhever lett, så en tredjedel er nok" },
     }),
   },
   {
@@ -172,33 +170,34 @@ const RECIPES = [
     feel: "standard",
     steps: tin({
       folds: { en: "Mix well, no folds", no: "Bland godt, ingen strekk og brett" },
-      bulk: { en: "Rise until puffy and cracked on top, 2–3 h", no: "Hev til den er luftig og sprekker på toppen, 2–3 t" },
+      bulk: { en: "Leave on the counter overnight; by morning it should look puffy and cracked on top", no: "La stå på benken over natten; om morgenen skal den være luftig og ha sprekker på toppen" },
+      shape: { en: "Morning: scrape into a greased tin with a wet hand", no: "Morgen: skrap over i smurt brødform med våt hånd" },
       rest: { en: "Wait until the next day before cutting", no: "Vent til neste dag før du skjærer" },
     }),
   },
   {
     key: "focaccia",
     name: { en: "Focaccia", no: "Focaccia" },
-    flours: [["ap", 500]],
     feel: "slack",
+    flours: [["ap", 500]],
     steps: {
       en: [
-        "Mix everything, rest 30 min",
-        "3–4 stretch and folds, 30 min apart",
-        "Fridge overnight (optional)",
-        "Oil a tin, stretch the dough into it",
-        "Rise until puffy, 2–4 h",
+        "17–18: mix everything",
+        "3–5 stretch and folds through the evening",
+        "Leave on the counter overnight",
+        "Morning: oil a tin and stretch the dough into it",
+        "Rise until puffy, 2–4 h, or fridge until after work",
         "Oil, dimple, flaky salt and rosemary",
-        "Bake at 230 °C for 20–25 min",
+        "230 °C for 20–25 min",
       ],
       no: [
-        "Bland alt, hvil 30 min",
-        "Strekk og brett 3–4 ganger, hvert 30. min",
-        "Kjøleskap over natten (valgfritt)",
-        "Olje i en langpanne, strekk ut deigen",
-        "Hev til den er luftig, 2–4 t",
+        "Kl. 17–18: bland alt",
+        "Strekk og brett 3–5 ganger utover kvelden",
+        "La stå på benken over natten",
+        "Morgen: olje i langpanne, strekk ut deigen",
+        "Hev til den er luftig, 2–4 t, eller i kjøleskapet til etter jobb",
         "Olje, fingergroper, flaksalt og rosmarin",
-        "Stek på 230 °C i 20–25 min",
+        "230 °C i 20–25 min",
       ],
     },
   },
@@ -299,7 +298,7 @@ export default function SourdoughCalculator() {
 
   const r = useMemo(() => {
     const addedFlour = flours.reduce((a, f) => a + (f.grams || 0), 0);
-    const starter = starterOverride ?? Math.round(addedFlour * 0.2);
+    const starter = starterOverride ?? Math.round(addedFlour * 0.1);
     const starterFlour = starter / 2; // assumes a 100% hydration starter
     const starterWater = starter / 2;
     const totalFlour = addedFlour + starterFlour;
