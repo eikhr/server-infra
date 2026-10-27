@@ -62,7 +62,6 @@ const STRINGS = {
     oatNote: "Oat flour has no gluten. Keep it to about 20% of the flour, or the loaf gets dense.",
     recipes: "Start from a recipe",
     method: "Method",
-    methodNote: "Times are for a lively starter in a warm kitchen. Go by how the dough looks, not the clock.",
     totalHint: "Change it to scale everything",
     flourHint: "change to scale",
   },
@@ -93,62 +92,39 @@ const STRINGS = {
     oatNote: "Havremel har ikke gluten. Hold det til rundt 20 % av melet, ellers blir brødet kompakt.",
     recipes: "Start fra en oppskrift",
     method: "Fremgangsmåte",
-    methodNote: "Tidene gjelder en aktiv surdeig på et varmt kjøkken. Se på deigen, ikke klokka.",
     totalHint: "Endre for å skalere alt",
     flourHint: "endre for å skalere",
   },
 };
 
-// Grovbrød bakes in a tin; each recipe swaps in its own fold, rise and resting advice
-const tinSteps = {
-  en: ({ folds, bulk, extra, rest }) => [
-    "Optional: the night before, pour 100 g of boiling water over 100 g of seeds (sunflower, linseed, pumpkin).",
-    "Mix the flour and water until no dry flour is left. Cover and rest for 30–60 minutes.",
-    "Add the starter and salt, and squeeze them through the dough until it is even again. Work in the soaked seeds now, if using.",
-    folds,
-    bulk,
-    "With wet hands, shape the dough into a log and put it in a greased bread tin, about 1.5 litres per kilo of dough.",
-    ...(extra ? [extra] : []),
-    "Cover and leave it in the fridge overnight, 8–16 hours, or at room temperature until it is just under the rim, 1–2 hours.",
-    "Bake at 230 °C for 45–50 minutes. Tip it out of the tin for the last 5–10 minutes so the sides crisp up. It is done at 96–98 °C inside, or when it sounds hollow underneath.",
-    rest,
-  ],
-  no: ({ folds, bulk, extra, rest }) => [
-    "Valgfritt: kvelden før, hell 100 g kokende vann over 100 g kjerner (solsikke, linfrø, gresskar).",
-    "Bland melet og vannet til alt melet er fuktet. Dekk til og la det hvile i 30–60 minutter.",
-    "Tilsett surdeigen og saltet, og klem det inn i deigen til den er jevn igjen. Arbeid inn de bløtlagte kjernene nå, om du bruker dem.",
-    folds,
-    bulk,
-    "Form deigen til en pølse med våte hender og legg den i en smurt brødform, rundt 1,5 liter per kilo deig.",
-    ...(extra ? [extra] : []),
-    "Dekk til og sett den i kjøleskapet over natten, 8–16 timer, eller la den heve i romtemperatur til den er like under kanten, 1–2 timer.",
-    "Stek på 230 °C i 45–50 minutter. Ta brødet ut av formen de siste 5–10 minuttene så sidene blir sprø. Det er ferdig ved 96–98 °C inni, eller når det høres hult ut når du banker under.",
-    rest,
-  ],
-};
-
-const T = {
-  folds: {
-    en: "Whole grain dough is sticky, so work with wet hands: give it three sets of stretch and folds, 30 minutes apart.",
-    no: "Grov deig er klissete, så jobb med våte hender: gi den tre runder med strekk og brett, med 30 minutters mellomrom.",
+// Short tin-loaf method; recipes override the steps that differ
+const TIN = {
+  en: {
+    mix: "Mix flour and water, rest 30–60 min",
+    add: "Add starter and salt",
+    folds: "3 stretch and folds, 30 min apart",
+    bulk: "Rise by about a third, 3–5 h",
+    shape: "Shape and put in a greased tin",
+    proof: "Fridge overnight, or 1–2 h at room temp",
+    bake: "Bake at 230 °C for 45–50 min",
+    rest: "Cool 2 h before cutting",
   },
-  bulk: {
-    en: "Leave it covered at room temperature until it has grown by about a third, 3–5 hours. Whole grain ferments fast, so start checking after 3.",
-    no: "La den stå tildekket i romtemperatur til den har vokst med omtrent en tredjedel, 3–5 timer. Grovt mel gjærer raskt, så sjekk etter 3 timer.",
-  },
-  rest: {
-    en: "Cool it on a rack under a tea towel for a soft crust. Wait at least two hours before cutting.",
-    no: "Avkjøl brødet på rist under et kjøkkenhåndkle for myk skorpe. Vent minst to timer før du skjærer det.",
-  },
-  restRye: {
-    en: "Cool it on a rack and wrap it in a tea towel. Rye needs time to set: wait until the next day before cutting.",
-    no: "Avkjøl brødet på rist og pakk det inn i et kjøkkenhåndkle. Rug trenger tid til å sette seg: vent til neste dag før du skjærer det.",
+  no: {
+    mix: "Bland mel og vann, hvil 30–60 min",
+    add: "Tilsett surdeig og salt",
+    folds: "Strekk og brett 3 ganger, hvert 30. min",
+    bulk: "Hev til en tredjedel større, 3–5 t",
+    shape: "Form og legg i smurt brødform",
+    proof: "Kjøleskap over natten, eller 1–2 t i romtemperatur",
+    bake: "Stek på 230 °C i 45–50 min",
+    rest: "Avkjøl 2 t før du skjærer",
   },
 };
-const tin = (o) => ({
-  en: tinSteps.en({ folds: o.folds?.en ?? T.folds.en, bulk: o.bulk?.en ?? T.bulk.en, extra: o.extra?.en, rest: o.rest?.en ?? T.rest.en }),
-  no: tinSteps.no({ folds: o.folds?.no ?? T.folds.no, bulk: o.bulk?.no ?? T.bulk.no, extra: o.extra?.no, rest: o.rest?.no ?? T.rest.no }),
-});
+const ORDER = ["mix", "add", "folds", "bulk", "shape", "topping", "proof", "bake", "rest"];
+const tin = (o = {}) =>
+  Object.fromEntries(
+    ["en", "no"].map((l) => [l, ORDER.map((k) => o[k]?.[l] ?? TIN[l][k]).filter((step) => step != null)]),
+  );
 
 const RECIPES = [
   {
@@ -156,38 +132,28 @@ const RECIPES = [
     name: { en: "Half whole wheat", no: "Halvgrovt brød" },
     flours: [["ap", 250], ["ww", 250]],
     feel: "standard",
-    steps: tin({}),
+    steps: tin(),
   },
   {
     key: "thirds",
     name: { en: "Three-way loaf", no: "Tredelt grovbrød" },
     flours: [["ap", 167], ["ww", 167], ["rye", 166]],
     feel: "standard",
-    steps: tin({
-      folds: {
-        en: "Rye makes the dough sticky, so work with wet hands and do just two sets of folds, 30 minutes apart.",
-        no: "Rug gjør deigen klissete, så jobb med våte hender og gi den bare to runder med strekk og brett, med 30 minutters mellomrom.",
-      },
-    }),
+    steps: tin({ folds: { en: "2 stretch and folds with wet hands, 30 min apart", no: "Strekk og brett 2 ganger med våte hender, hvert 30. min" } }),
   },
   {
     key: "extra",
     name: { en: "Extra coarse", no: "Ekstra grovt" },
     flours: [["ap", 150], ["ww", 350]],
     feel: "standard",
-    steps: tin({}),
+    steps: tin(),
   },
   {
     key: "oat",
     name: { en: "Oat grovbrød", no: "Havregrovbrød" },
     flours: [["ap", 200], ["ww", 200], ["oat", 100]],
     feel: "standard",
-    steps: tin({
-      extra: {
-        en: "If you like, brush the top with water and sprinkle it with oats.",
-        no: "Om du vil, kan du pensle toppen med vann og drysse over havregryn.",
-      },
-    }),
+    steps: tin({ topping: { en: "Sprinkle oats on top", no: "Dryss havregryn på toppen" } }),
   },
   {
     key: "spelt",
@@ -195,14 +161,8 @@ const RECIPES = [
     flours: [["spelt", 200], ["wspelt", 300]],
     feel: "firmer",
     steps: tin({
-      folds: {
-        en: "Spelt gluten is fragile: give it just two gentle sets of folds, 30 minutes apart.",
-        no: "Glutenet i spelt er skjørt: gi deigen bare to forsiktige runder med strekk og brett, med 30 minutters mellomrom.",
-      },
-      bulk: {
-        en: "Leave it covered until it has grown by about a third, 3–4 hours. Spelt collapses if it goes too far.",
-        no: "La den stå tildekket til den har vokst med omtrent en tredjedel, 3–4 timer. Spelt faller sammen om den hever for lenge.",
-      },
+      folds: { en: "2 gentle stretch and folds, 30 min apart", no: "Strekk og brett forsiktig 2 ganger, hvert 30. min" },
+      bulk: { en: "Rise by about a third, 3–4 h; don't overdo it", no: "Hev til en tredjedel større, 3–4 t; ikke for lenge" },
     }),
   },
   {
@@ -211,15 +171,9 @@ const RECIPES = [
     flours: [["ap", 250], ["wrye", 250]],
     feel: "standard",
     steps: tin({
-      folds: {
-        en: "Half rye won't build much structure, so skip the folds: just mix it well with a wet hand or spatula.",
-        no: "Med halvparten rug bygger deigen lite struktur, så dropp strekk og brett: bare bland godt med våt hånd eller slikkepott.",
-      },
-      bulk: {
-        en: "Leave it covered for 2–3 hours, until it looks puffy and has small cracks on top.",
-        no: "La den stå tildekket i 2–3 timer, til den ser luftig ut og har små sprekker på toppen.",
-      },
-      rest: T.restRye,
+      folds: { en: "Mix well, no folds", no: "Bland godt, ingen strekk og brett" },
+      bulk: { en: "Rise until puffy and cracked on top, 2–3 h", no: "Hev til den er luftig og sprekker på toppen, 2–3 t" },
+      rest: { en: "Wait until the next day before cutting", no: "Vent til neste dag før du skjærer" },
     }),
   },
   {
@@ -229,22 +183,22 @@ const RECIPES = [
     feel: "slack",
     steps: {
       en: [
-        "Mix everything into a wet, shaggy dough. Cover and rest for 30 minutes.",
-        "Stretch and fold every 30 minutes, three or four times.",
-        "Cover and leave it in the fridge overnight for the best flavour, or carry on once it has grown by half.",
-        "Pour 3 tablespoons of olive oil into a baking tin (about 25 × 35 cm for 500 g of flour), tip the dough in and gently stretch it towards the corners.",
-        "Let it rise until it is puffy and jiggles, 2–4 hours.",
-        "Drizzle with more oil, press dimples all over with your fingertips, and top with flaky salt and rosemary.",
-        "Bake at 230 °C for 20–25 minutes, until deep golden.",
+        "Mix everything, rest 30 min",
+        "3–4 stretch and folds, 30 min apart",
+        "Fridge overnight (optional)",
+        "Oil a tin, stretch the dough into it",
+        "Rise until puffy, 2–4 h",
+        "Oil, dimple, flaky salt and rosemary",
+        "Bake at 230 °C for 20–25 min",
       ],
       no: [
-        "Bland alt til en våt og ujevn deig. Dekk til og la den hvile i 30 minutter.",
-        "Strekk og brett deigen hvert 30. minutt, tre eller fire ganger.",
-        "Dekk til og sett den i kjøleskapet over natten for best smak, eller fortsett når den har vokst med omtrent halvparten.",
-        "Hell 3 spiseskjeer olivenolje i en langpanne eller form (rundt 25 × 35 cm for 500 g mel), vend deigen over og strekk den forsiktig ut mot hjørnene.",
-        "La den heve til den er luftig og dirrer, 2–4 timer.",
-        "Drypp over mer olje, trykk groper i deigen med fingertuppene, og dryss over flaksalt og rosmarin.",
-        "Stek på 230 °C i 20–25 minutter, til den er gyllenbrun.",
+        "Bland alt, hvil 30 min",
+        "Strekk og brett 3–4 ganger, hvert 30. min",
+        "Kjøleskap over natten (valgfritt)",
+        "Olje i en langpanne, strekk ut deigen",
+        "Hev til den er luftig, 2–4 t",
+        "Olje, fingergroper, flaksalt og rosmarin",
+        "Stek på 230 °C i 20–25 min",
       ],
     },
   },
@@ -586,15 +540,11 @@ export default function SourdoughCalculator() {
             <h2 className="text-xl" style={display}>
               {t.method} · {activeRecipe.name[lang]}
             </h2>
-            <ol className="mt-3 space-y-3 text-sm leading-relaxed" style={{ color: ink, ...sans }}>
+            <ul className="mt-3 pl-5 list-disc space-y-1 text-sm" style={{ color: ink, ...sans }}>
               {activeRecipe.steps[lang].map((step, i) => (
-                <li key={i} className="flex gap-3">
-                  <span className="method-num shrink-0 tabular-nums">{i + 1}</span>
-                  <span>{step}</span>
-                </li>
+                <li key={i}>{step}</li>
               ))}
-            </ol>
-            <p className="mt-4 text-xs" style={{ color: inkSoft, ...sans }}>{t.methodNote}</p>
+            </ul>
           </div>
         )}
       </div>
