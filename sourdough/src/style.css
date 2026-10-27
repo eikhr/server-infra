@@ -28,3 +28,7 @@ body { margin: 0; background: #F6F1E7; }
   .results { padding: 20px 16px; margin-left: -4px; margin-right: -4px; }
   .calculator input { width: 5rem; }
 }
+.lang-switch { display: flex; justify-content: flex-end; gap: 2px; margin: -10px 0 4px; }
+.lang-switch button { font-weight: 600; letter-spacing: .08em; }
+.method h2 { color: #79512F; }
+.method-num { width: 1.6rem; height: 1.6rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: #E8DECC; color: #79512F; font-size: .75rem; font-weight: 700; margin-top: 1px; }
