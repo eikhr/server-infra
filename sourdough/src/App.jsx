@@ -5,10 +5,7 @@ const inkSoft = "#73604D";
 const crust = "#F6F1E7";
 const crustLight = "#FFFDF7";
 const crustLine = "#D8CBB5";
-const waterBlue = "#628B94";
-const starterGold = "#A85E25";
-const saltGrey = "#9D9A85";
-const flourTones = ["#B98542", "#79512F", "#D5B57A", "#A08B55", "#CE9D66"];
+const MAX_FLOURS = 5;
 
 const display = { fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', fontWeight: 650, letterSpacing: "-0.035em" };
 const sans = { fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' };
@@ -37,7 +34,6 @@ const FEELS = [
 const STRINGS = {
   en: {
     title: "Sourdough calculator",
-    tagline: "Flour · water · salt · time",
     intro: "Weigh your flours. It works out the water, salt and starter.",
     yourFlour: "Your flour",
     flourType: "Flour type",
@@ -49,9 +45,9 @@ const STRINGS = {
     roomTemp: "Room temperature",
     mixedAt: "Mixed at",
     coldStarter: "Starter straight from the fridge",
-    hours: "h",
-    readyAround: (a, b) => `ready around ${a}–${b}`,
-    riseNote: "A rough guide to when the dough has grown by a third to a half. Whole grain speeds it up; a sluggish starter or cool dough slows it down. Trust the dough over the clock.",
+    readyAt: (a, b) => `Ready around ${a}–${b}`,
+    riseFor: (h) => `${h} h rise`,
+    riseNote: "A rough guide to when the dough has grown by a third to a half. Trust the dough over the clock.",
     addFlour: "Add a flour",
     feelHeading: "How should the dough feel?",
     feels: { firmer: "Firmer", standard: "Standard", slack: "Slack" },
@@ -65,16 +61,15 @@ const STRINGS = {
     starterAmount: "Starter amount",
     salt: "Salt",
     saltNote: "2% of flour",
-    hydration: "Hydration this gives you",
+    hydration: "Hydration",
     totalDough: "Total dough",
-    footnote: "Assumes a 100% hydration starter fed with white flour. Its water and flour are already counted, so the water above is what actually goes in the bowl.",
+    footnote: "Assumes a 100% hydration starter; its flour and water are already counted.",
     oatNote: "Oat flour has no gluten. Keep it to about 20% of the flour, or the loaf gets dense.",
     recipes: "Start from a recipe",
     method: "Method",
   },
   no: {
     title: "Surdeigskalkulator",
-    tagline: "Mel · vann · salt · tid",
     intro: "Vei opp melet ditt. Kalkulatoren regner ut vann, salt og surdeig.",
     yourFlour: "Melet ditt",
     flourType: "Meltype",
@@ -86,9 +81,9 @@ const STRINGS = {
     roomTemp: "Romtemperatur",
     mixedAt: "Blandet kl.",
     coldStarter: "Surdeig rett fra kjøleskapet",
-    hours: "t",
-    readyAround: (a, b) => `klar ca. kl. ${a}–${b}`,
-    riseNote: "Et grovt anslag for når deigen har vokst med en tredjedel til halvparten. Grovt mel gjør det raskere; treg surdeig eller kald deig gjør det tregere. Stol mer på deigen enn klokka.",
+    readyAt: (a, b) => `Klar ca. kl. ${a}–${b}`,
+    riseFor: (h) => `${h} t heving`,
+    riseNote: "Et grovt anslag for når deigen har vokst med en tredjedel til halvparten. Stol mer på deigen enn klokka.",
     addFlour: "Legg til mel",
     feelHeading: "Hvordan skal deigen kjennes?",
     feels: { firmer: "Fastere", standard: "Standard", slack: "Løsere" },
@@ -102,9 +97,9 @@ const STRINGS = {
     starterAmount: "Mengde surdeig",
     salt: "Salt",
     saltNote: "2 % av melet",
-    hydration: "Dette gir en hydrering på",
+    hydration: "Hydrering",
     totalDough: "Total deig",
-    footnote: "Forutsetter en surdeig med 100 % hydrering, matet med hvetemel. Vannet og melet i surdeigen er allerede regnet med, så vannet over er det du faktisk har i bollen.",
+    footnote: "Forutsetter surdeig med 100 % hydrering; melet og vannet i den er regnet med.",
     oatNote: "Havremel har ikke gluten. Hold det til rundt 20 % av melet, ellers blir brødet kompakt.",
     recipes: "Start fra en oppskrift",
     method: "Fremgangsmåte",
@@ -114,7 +109,7 @@ const STRINGS = {
 // Evening-to-morning tin-loaf method; recipes override the steps that differ
 const TIN = {
   en: {
-    mix: "17–18: mix flour, water, starter and salt",
+    mix: "{mix}: mix flour, water, starter and salt",
     folds: "3–5 stretch and folds through the evening",
     bulk: "Leave on the counter overnight; by morning it should have grown by a third to a half",
     shape: "Morning: shape and put in a greased tin",
@@ -123,7 +118,7 @@ const TIN = {
     rest: "Cool 2 h before cutting",
   },
   no: {
-    mix: "Kl. 17–18: bland mel, vann, surdeig og salt",
+    mix: "Kl. {mix}: bland mel, vann, surdeig og salt",
     folds: "Strekk og brett 3–5 ganger utover kvelden",
     bulk: "La stå på benken over natten; om morgenen skal den ha vokst med en tredjedel til halvparten",
     shape: "Morgen: form og legg i smurt brødform",
@@ -162,7 +157,7 @@ const RECIPES = [
   },
   {
     key: "oat",
-    name: { en: "Oat grovbrød", no: "Havregrovbrød" },
+    name: { en: "Oat wholemeal loaf", no: "Havregrovbrød" },
     flours: [["ap", 200], ["ww", 200], ["oat", 100]],
     feel: "standard",
     steps: tin({ topping: { en: "Sprinkle oats on top", no: "Dryss havregryn på toppen" } }),
@@ -196,7 +191,7 @@ const RECIPES = [
     flours: [["ap", 500]],
     steps: {
       en: [
-        "17–18: mix everything",
+        "{mix}: mix everything",
         "3–5 stretch and folds through the evening",
         "Leave on the counter overnight",
         "Morning: oil a tin and stretch the dough into it",
@@ -205,7 +200,7 @@ const RECIPES = [
         "230 °C for 20–25 min",
       ],
       no: [
-        "Kl. 17–18: bland alt",
+        "Kl. {mix}: bland alt",
         "Strekk og brett 3–5 ganger utover kvelden",
         "La stå på benken over natten",
         "Morgen: olje i langpanne, strekk ut deigen",
@@ -279,7 +274,7 @@ function GramsInput({ value, onChange, ariaLabel, wide }) {
         value={value}
         min={0}
         onChange={(e) => onChange(Math.max(0, parseFloat(e.target.value) || 0))}
-        className={`${wide ? "w-28" : "w-24"} h-12 text-center text-xl rounded-md bg-transparent focus:outline-none focus-visible:ring-2`}
+        className={`${wide ? "w-28" : "w-24"} h-12 text-center text-lg rounded-md bg-transparent focus:outline-none focus-visible:ring-2`}
         style={{ color: ink, border: `1px solid ${crustLine}`, ...display }}
       />
       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm pointer-events-none" style={{ color: inkSoft }}>g</span>
@@ -314,19 +309,28 @@ function TotalInput({ value, onCommit, ariaLabel, unit = "g" }) {
   );
 }
 
-function Row({ swatch, name, grams, note, decimals = 0 }) {
-  const shown = decimals ? (Math.round(grams * 10) / 10).toFixed(1) : Math.round(grams);
+function AmountRow({ label, note, muted, children }) {
   return (
-    <div className="flex items-baseline gap-3 py-2">
-      <span className="w-3 h-3 rounded-sm shrink-0 self-center" style={{ background: swatch }} />
-      <span className="flex-1 min-w-0" style={{ color: ink, ...sans }}>
-        {name}
-        {note && <span className="ml-2 text-xs" style={{ color: inkSoft }}>{note}</span>}
-      </span>
-      <span className="tabular-nums" style={{ color: ink, fontSize: 30, ...display }}>
-        {shown}
-        <span className="text-sm ml-1" style={{ color: inkSoft }}>g</span>
-      </span>
+    <div className="flex items-center gap-3 min-h-12 py-1">
+      <div className="flex-1 min-w-0" style={{ color: muted ? inkSoft : ink, ...sans }}>
+        {label}
+        {note && <div className="note">{note}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// Same footprint as a Stepper, so computed and editable amounts share one column
+function StaticAmount({ value, unit = "g", muted }) {
+  return (
+    <div className="stepper flex items-stretch h-12 shrink-0" style={{ border: "1px solid transparent" }}>
+      <span className="w-10 shrink-0" />
+      <div className="relative flex">
+        <output className="static-value tabular-nums text-lg" style={{ color: muted ? inkSoft : ink, ...display }}>{value}</output>
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm pointer-events-none" style={{ color: inkSoft }}>{unit}</span>
+      </div>
+      <span className="w-10 shrink-0" />
     </div>
   );
 }
@@ -418,50 +422,38 @@ export default function SourdoughCalculator() {
   const oatGrams = flours.reduce((a, f) => a + (f.type === "oat" ? f.grams || 0 : 0), 0);
   const oatShare = r.addedFlour > 0 ? oatGrams / r.addedFlour : 0;
 
-  const segments = [
-    ...flours.map((f, i) => ({ w: f.grams || 0, color: flourTones[i % flourTones.length] })),
-    { w: Math.max(0, r.waterAdd), color: waterBlue },
-    { w: r.starter, color: starterGold },
-    { w: r.salt, color: saltGrey },
-  ].filter((x) => x.w > 0);
-
   return (
     <div className="min-h-screen" style={{ background: crust, color: ink }}>
-      <div className="calculator max-w-lg mx-auto px-5 pt-10 pb-16">
-        <div className="lang-switch" role="group" aria-label="Language / Språk">
-          {[
-            { key: "no", label: "NO" },
-            { key: "en", label: "EN" },
-          ].map((l) => (
-            <button
-              key={l.key}
-              type="button"
-              aria-pressed={lang === l.key}
-              onClick={() => setLang(l.key)}
-              className="h-8 px-3 rounded-md text-xs focus:outline-none focus-visible:ring-2"
-              style={{ background: lang === l.key ? ink : "transparent", color: lang === l.key ? crust : inkSoft, ...sans }}
-            >
-              {l.label}
-            </button>
-          ))}
-        </div>
-        <div className="bakery-mark" aria-hidden="true">
-          <svg viewBox="0 0 140 90" fill="none">
-            <path d="M15 58C12 32 34 12 68 11C104 8 129 30 127 55C126 72 109 79 72 79C37 80 18 73 15 58Z" fill="#CB9148" stroke="#70441F" strokeWidth="2.5" />
-            <path d="M22 58C43 68 99 69 120 55" stroke="#A46930" strokeWidth="2" />
-            <path d="M42 28C34 37 32 46 35 53M66 22C55 33 53 45 57 57M91 24C80 33 77 45 80 57M111 34C103 40 99 47 100 53" stroke="#F8E5B9" strokeWidth="7" strokeLinecap="round" />
-            <path d="M26 43L27 42M47 62L48 62M100 63L101 62M76 17L77 17" stroke="#F8E5B9" strokeWidth="2" strokeLinecap="round" />
+      <div className="calculator max-w-lg mx-auto px-5 pt-6 pb-16">
+        <header className="flex items-center gap-3">
+          <svg className="loaf shrink-0" viewBox="0 0 140 90" fill="none" aria-hidden="true">
+            <path d="M15 58C12 32 34 12 68 11C104 8 129 30 127 55C126 72 109 79 72 79C37 80 18 73 15 58Z" fill="#CB9148" stroke="#70441F" strokeWidth="4" />
+            <path d="M42 28C34 37 32 46 35 53M66 22C55 33 53 45 57 57M91 24C80 33 77 45 80 57M111 34C103 40 99 47 100 53" stroke="#F8E5B9" strokeWidth="8" strokeLinecap="round" />
           </svg>
-          <span>{t.tagline}</span>
-        </div>
-        <h1 className="text-3xl leading-tight mb-3" style={display}>{t.title}</h1>
-        <p className="mt-1 text-sm" style={{ color: inkSoft, ...sans }}>
-          {t.intro}
-        </p>
+          <h1 className="flex-1 min-w-0" style={display}>{t.title}</h1>
+          <div className="lang-switch flex shrink-0" role="group" aria-label="Language / Språk">
+            {[
+              { key: "no", label: "NO" },
+              { key: "en", label: "EN" },
+            ].map((l) => (
+              <button
+                key={l.key}
+                type="button"
+                aria-pressed={lang === l.key}
+                onClick={() => setLang(l.key)}
+                className="h-10 w-10 rounded-md text-xs focus:outline-none focus-visible:ring-2"
+                style={{ background: lang === l.key ? ink : "transparent", color: lang === l.key ? crust : inkSoft, ...sans }}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+        </header>
+        <p className="intro mt-2" style={{ color: inkSoft, ...sans }}>{t.intro}</p>
 
         {/* Recipes */}
-        <div className="mt-6">
-          <h2 className="text-xl" style={display}>{t.recipes}</h2>
+        <section className="mt-7">
+          <h2 style={display}>{t.recipes}</h2>
           <div className="recipe-chips mt-3 flex flex-wrap gap-2">
             {RECIPES.map((rec) => (
               <button
@@ -469,7 +461,7 @@ export default function SourdoughCalculator() {
                 type="button"
                 aria-pressed={recipe === rec.key}
                 onClick={() => pickRecipe(rec)}
-                className="h-9 px-3 rounded-full text-sm focus:outline-none focus-visible:ring-2"
+                className="h-9 px-3 rounded-full text-sm shrink-0 focus:outline-none focus-visible:ring-2"
                 style={{
                   background: recipe === rec.key ? ink : crustLight,
                   color: recipe === rec.key ? crust : ink,
@@ -481,20 +473,19 @@ export default function SourdoughCalculator() {
               </button>
             ))}
           </div>
-        </div>
+        </section>
 
         {/* Flours */}
-        <div className="mt-8">
-          <h2 className="text-xl" style={display}>{t.yourFlour}</h2>
+        <section className="mt-8">
+          <h2 style={display}>{t.yourFlour}</h2>
           <div className="mt-1">
-            {flours.map((f, i) => (
+            {flours.map((f) => (
               <div key={f.id} className="flour-row py-2" style={{ borderBottom: `1px solid ${crustLine}` }}>
-                <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: flourTones[i % flourTones.length] }} />
                 <select
                   value={f.type}
                   aria-label={t.flourType}
                   onChange={(e) => updateFlour(f.id, { type: e.target.value })}
-                  className="flex-1 min-w-0 w-full h-12 px-2 rounded-md focus:outline-none focus-visible:ring-2"
+                  className="min-w-0 w-full h-12 px-2 rounded-md focus:outline-none focus-visible:ring-2"
                   style={{ background: crustLight, color: ink, border: `1px solid ${crustLine}`, ...sans }}
                 >
                   {FLOUR_TYPES.map((ft) => (
@@ -517,28 +508,27 @@ export default function SourdoughCalculator() {
               </div>
             ))}
           </div>
-          {oatShare > 0.2 && (
-            <p className="mt-2 text-xs" style={{ color: starterGold, ...sans }}>{t.oatNote}</p>
-          )}
+          {oatShare > 0.2 && <p className="note warn mt-2">{t.oatNote}</p>}
           <button
             type="button"
             onClick={addFlour}
-            disabled={flours.length >= flourTones.length}
-            className="add-flour mt-3 h-11 px-4 rounded-md text-sm disabled:opacity-30 focus:outline-none focus-visible:ring-2"
-            style={{ background: ink, color: "#FFFDF7", ...sans }}
+            disabled={flours.length >= MAX_FLOURS}
+            className="add-flour mt-3 w-full h-11 rounded-md text-sm disabled:opacity-30 focus:outline-none focus-visible:ring-2"
+            style={{ color: ink, ...sans }}
           >
-            {t.addFlour}
+            + {t.addFlour}
           </button>
-        </div>
+        </section>
 
         {/* Dough feel */}
-        <div className="mt-8">
-          <h2 className="text-xl" style={display}>{t.feelHeading}</h2>
+        <section className="mt-8">
+          <h2 style={display}>{t.feelHeading}</h2>
           <div className="feel-selector mt-3 flex rounded-md p-1 text-sm" style={{ background: crustLight, ...sans }}>
             {FEELS.map((f) => (
               <button
                 key={f.key}
                 type="button"
+                aria-pressed={feel === f.key}
                 onClick={() => setFeel(f.key)}
                 className="flex-1 h-10 rounded-md transition-colors focus:outline-none focus-visible:ring-2"
                 style={{ background: feel === f.key ? ink : "transparent", color: feel === f.key ? crust : inkSoft }}
@@ -547,133 +537,101 @@ export default function SourdoughCalculator() {
               </button>
             ))}
           </div>
-          <p className="mt-2 text-xs" style={{ color: inkSoft, ...sans }}>
-            {t.feelHint}
-          </p>
-        </div>
+          <p className="note mt-2">{t.feelHint}</p>
+        </section>
 
         {/* Results */}
-        <div className="results mt-8">
-          <h2 className="text-xl" style={display}>{t.addToBowl}</h2>
-
-          <div className="mt-4 h-2 w-full flex rounded-sm overflow-hidden" aria-hidden="true">
-            {segments.map((s, i) => (
-              <div key={i} style={{ width: `${(s.w / Math.max(1, r.total)) * 100}%`, background: s.color }} />
-            ))}
-          </div>
-
-          <div className="mt-3">
-            <div className="flex items-center gap-3 py-2">
-              <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: flourTones[0] }} />
-              <span className="flex-1 min-w-0" style={{ color: ink, ...sans }}>
-                {t.flour}
-              </span>
+        <section className="card mt-8">
+          <h2 style={display}>{t.addToBowl}</h2>
+          <div className="mt-2">
+            <AmountRow label={t.flour}>
               <Stepper step={100} t={t} onStep={(d) => r.addedFlour + d > 0 && scaleFlourTo(r.addedFlour + d)}>
                 <TotalInput ariaLabel={t.flour} value={r.addedFlour} onCommit={scaleFlourTo} />
               </Stepper>
-            </div>
-            <Row swatch={waterBlue} name={t.water} grams={Math.max(0, r.waterAdd)} />
-            <div className="flex items-center gap-3 py-2">
-              <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: starterGold }} />
-              <span className="flex-1 min-w-0" style={{ color: ink, ...sans }}>
-                {t.starter}
-                {starterOverride === null ? (
-                  <span className="block text-xs" style={{ color: inkSoft }}>{t.starterAuto}</span>
+            </AmountRow>
+            <AmountRow label={t.water}>
+              <StaticAmount value={Math.round(Math.max(0, r.waterAdd))} />
+            </AmountRow>
+            <AmountRow
+              label={t.starter}
+              note={
+                starterOverride === null ? (
+                  t.starterAuto
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setStarterOverride(null)}
-                    className="block text-xs underline focus:outline-none focus-visible:ring-2 rounded"
-                    style={{ color: starterGold }}
-                  >
+                  <button type="button" onClick={() => setStarterOverride(null)} className="underline rounded focus:outline-none focus-visible:ring-2">
                     {t.backToAuto}
                   </button>
-                )}
-              </span>
+                )
+              }
+            >
               <Stepper step={10} t={t} onStep={(d) => setStarterOverride(Math.max(0, r.starter + d))}>
                 <GramsInput ariaLabel={t.starterAmount} value={r.starter} onChange={(g) => setStarterOverride(g)} />
               </Stepper>
-            </div>
-            <Row swatch={saltGrey} name={t.salt} grams={r.salt} note={t.saltNote} decimals={1} />
+            </AmountRow>
+            <AmountRow label={t.salt} note={t.saltNote}>
+              <StaticAmount value={(Math.round(r.salt * 10) / 10).toLocaleString(lang === "no" ? "nb" : "en", { minimumFractionDigits: 1 })} />
+            </AmountRow>
           </div>
-
-          <div className="mt-4 pt-3 text-sm space-y-1" style={{ borderTop: `1px solid ${crustLine}`, color: inkSoft, ...sans }}>
-            <div className="flex justify-between">
-              <span>{t.hydration}</span>
-              <span className="tabular-nums">{r.totalFlour > 0 ? Math.round(r.hyd * 100) : 0}%</span>
-            </div>
-            <div className="flex items-center justify-between gap-3 pt-2" style={{ color: ink }}>
-              <span>
-                {t.totalDough}
-              </span>
+          <div className="card-divider">
+            <AmountRow label={t.hydration} muted>
+              <StaticAmount value={r.totalFlour > 0 ? Math.round(r.hyd * 100) : 0} unit="%" muted />
+            </AmountRow>
+            <AmountRow label={t.totalDough}>
               <Stepper step={100} t={t} onStep={(d) => r.total + d > 0 && scaleTotalTo(r.total + d)}>
                 <TotalInput ariaLabel={t.totalDough} value={r.total} onCommit={scaleTotalTo} />
               </Stepper>
-            </div>
+            </AmountRow>
           </div>
-
-          <p className="mt-4 text-xs leading-relaxed" style={{ color: inkSoft, ...sans }}>
-            {t.footnote}
-          </p>
-        </div>
+          <p className="note mt-3">{t.footnote}</p>
+        </section>
 
         {/* Rise time */}
-        <div className="rise mt-8">
-          <h2 className="text-xl" style={display}>{t.riseHeading}</h2>
-          <div className="mt-3 text-sm" style={{ color: ink, ...sans }}>
-            <div className="flex items-center justify-between gap-3 py-2" style={{ borderBottom: `1px solid ${crustLine}` }}>
-              <span>{t.roomTemp}</span>
+        <section className="card mt-6">
+          <h2 style={display}>{t.riseHeading}</h2>
+          <div className="mt-2">
+            <AmountRow label={t.roomTemp}>
               <Stepper step={1} unit="°C" t={t} onStep={(d) => updateRise({ temp: Math.min(32, Math.max(10, rise.temp + d)) })}>
                 <TotalInput unit="°C" ariaLabel={t.roomTemp} value={rise.temp} onCommit={(v) => updateRise({ temp: Math.min(32, Math.max(10, Math.round(v))) })} />
               </Stepper>
-            </div>
-            <div className="flex items-center justify-between gap-3 py-2" style={{ borderBottom: `1px solid ${crustLine}` }}>
-              <span>{t.mixedAt}</span>
+            </AmountRow>
+            <AmountRow label={t.mixedAt}>
               <input
                 type="time"
                 aria-label={t.mixedAt}
                 value={rise.mixAt}
                 onChange={(e) => e.target.value && updateRise({ mixAt: e.target.value })}
-                className="time-input h-12 px-3 rounded-md text-lg focus:outline-none focus-visible:ring-2"
+                className="time-input h-12 rounded-md text-lg focus:outline-none focus-visible:ring-2"
                 style={{ color: ink, border: `1px solid ${crustLine}`, ...display }}
               />
-            </div>
-            <label className="flex items-center gap-3 py-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={rise.coldStarter}
-                onChange={(e) => updateRise({ coldStarter: e.target.checked })}
-                className="cold-check w-5 h-5 shrink-0"
-              />
+            </AmountRow>
+            <label className="flex items-center gap-3 min-h-12 cursor-pointer" style={sans}>
+              <input type="checkbox" checked={rise.coldStarter} onChange={(e) => updateRise({ coldStarter: e.target.checked })} className="cold-check shrink-0" />
               <span>{t.coldStarter}</span>
             </label>
           </div>
           {riseRange && (
-            <div className="rise-result mt-2 flex items-baseline justify-between gap-3 flex-wrap">
-              <span className="tabular-nums" style={{ color: ink, fontSize: 30, ...display }}>
-                {fmtHours(riseRange[0])}–{fmtHours(riseRange[1])}
-                <span className="text-sm ml-1" style={{ color: inkSoft }}>{t.hours}</span>
-              </span>
-              <span className="text-sm tabular-nums" style={{ color: starterGold, ...sans }}>
-                {t.readyAround(clockAfter(riseRange[0]), clockAfter(riseRange[1]))}
-              </span>
+            <div className="card-divider rise-out">
+              <div className="tabular-nums" style={{ color: ink, ...display }}>
+                {t.readyAt(clockAfter(riseRange[0]), clockAfter(riseRange[1]))}
+              </div>
+              <div className="note tabular-nums">{t.riseFor(`${fmtHours(riseRange[0])}–${fmtHours(riseRange[1])}`)}</div>
             </div>
           )}
-          <p className="mt-2 text-xs leading-relaxed" style={{ color: inkSoft, ...sans }}>{t.riseNote}</p>
-        </div>
+          <p className="note mt-3">{t.riseNote}</p>
+        </section>
 
         {/* Method */}
         {activeRecipe && (
-          <div className="method mt-8">
-            <h2 className="text-xl" style={display}>
-              {t.method} · {activeRecipe.name[lang]}
+          <section className="method mt-8">
+            <h2 style={display}>
+              {t.method}: {activeRecipe.name[lang]}
             </h2>
-            <ul className="mt-3 pl-5 list-disc space-y-1 text-sm" style={{ color: ink, ...sans }}>
+            <ul className="mt-3 pl-5 list-disc space-y-1" style={{ color: ink, ...sans }}>
               {activeRecipe.steps[lang].map((step, i) => (
-                <li key={i}>{step}</li>
+                <li key={i}>{step.replace("{mix}", rise.mixAt)}</li>
               ))}
             </ul>
-          </div>
+          </section>
         )}
       </div>
     </div>

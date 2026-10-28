@@ -4,50 +4,64 @@
 
 :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
 body { margin: 0; background: #F6F1E7; }
-.min-h-screen { background-image: radial-gradient(#92774d12 .7px, transparent .7px); background-size: 6px 6px; }
-.calculator { padding-top: 26px; }
-.bakery-mark { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 18px; }
-.bakery-mark svg { width: 112px; height: 72px; transform: rotate(-7deg); }
-.bakery-mark span { color: #79512F; font-family: ui-monospace, monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .15em; }
-.calculator h1 { text-align: center; font-size: clamp(1.8rem, 7vw, 2.35rem); line-height: 1.1; font-weight: 800 !important; letter-spacing: -.045em !important; }
-.calculator h1 + p { text-align: center; line-height: 1.6; max-width: 34ch; margin: 0 auto 30px; }
-.calculator h2 { font-size: .78rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+
+/* Header */
+.calculator .loaf { width: 34px; height: 22px; }
+.calculator h1 { font-size: clamp(1.35rem, 5.6vw, 1.9rem); line-height: 1.15; font-weight: 800 !important; letter-spacing: -.02em !important; }
+.calculator .intro { font-size: 15px; line-height: 1.5; }
+.lang-switch { gap: 2px; }
+.lang-switch button { letter-spacing: .06em; }
+
+/* Section headings: plain sentence case, one colour */
+.calculator h2 { font-size: 1rem; font-weight: 650; letter-spacing: -.01em !important; color: #38291F; }
+
+/* Small explanatory text */
+.calculator .note { font-size: 13px; line-height: 1.5; color: #73604D; }
+.calculator .note.warn { color: #8F4E1C; }
+
+/* Controls */
 .calculator input { font-variant-numeric: tabular-nums; padding-right: 16px; background: #FFFDF7; appearance: textfield; }
 .calculator input::-webkit-inner-spin-button, .calculator input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .calculator button { font-weight: 600; }
 .calculator button:not(:disabled) { cursor: pointer; }
 .calculator button:not(:disabled):hover { filter: brightness(.94); }
 .calculator :is(button,input,select):focus-visible { outline: 3px solid #A85E25; outline-offset: 3px; box-shadow: none; }
-.add-flour { background: #79512F !important; }
 .feel-selector { border: 1px solid #D8CBB5; }
-.results { position: relative; padding: 24px; background: #FFFDF7; border: 1px solid #D8CBB5; border-top: 4px solid #B98542; border-radius: 3px 3px 12px 3px; box-shadow: 4px 5px 0 #E8DECC; }
-.results h2 { color: #79512F; }
-.results .tabular-nums { font-variant-numeric: tabular-nums; }
-.results > .mt-4.pt-3 { border-top-style: dashed !important; }
-@media (max-width: 420px) {
-  .results { padding: 20px 16px; margin-left: -4px; margin-right: -4px; }
-  .calculator input { width: 5rem; }
-}
-.lang-switch { display: flex; justify-content: flex-end; gap: 2px; margin: -10px 0 4px; }
-.lang-switch button { font-weight: 600; letter-spacing: .08em; }
-.method h2 { color: #79512F; }
-.method li::marker { color: #A85E25; }
-.flour-row { display: flex; align-items: center; gap: 8px; }
-.flour-row select { flex: 1 1 0; }
+.add-flour { background: transparent; border: 1px dashed #C9B89C; }
+.calculator .add-flour:not(:disabled):hover { background: #FFFDF7; filter: none; }
+
+/* Stepper: − value + in one control; StaticAmount reuses the footprint */
 .stepper input { border: 0 !important; border-left: 1px solid #D8CBB5 !important; border-right: 1px solid #D8CBB5 !important; border-radius: 0 !important; height: auto !important; width: 5.5rem !important; padding: 0 18px 0 6px !important; }
 .stepper .relative { display: flex; }
+.static-value { display: flex; align-items: center; justify-content: center; width: 5.5rem; padding: 0 18px 0 6px; border-left: 1px solid transparent; border-right: 1px solid transparent; }
 .calculator .stepper-btn { font-weight: 500; transition: background .12s; }
 .calculator .stepper-btn:hover, .calculator .stepper-btn:active { background: #EFE6D6; filter: none; }
 .calculator .stepper :is(button, input):focus-visible { outline-offset: -3px; }
+
+/* Flour rows */
+.flour-row { display: flex; align-items: center; gap: 8px; }
+.flour-row select { flex: 1 1 0; }
+
+/* Output cards */
+.card { padding: 18px 20px; background: #FFFDF7; border: 1px solid #D8CBB5; border-radius: 8px; }
+.card-divider { margin-top: 8px; padding-top: 8px; border-top: 1px solid #E6DCCB; }
+.rise-out > :first-child { font-size: 1.35rem; line-height: 1.3; letter-spacing: -.01em !important; }
+.calculator .time-input { width: calc(5.5rem + 80px + 2px); padding: 0 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.calculator .cold-check { width: 20px; height: 20px; padding: 0; margin: 0; accent-color: #A85E25; }
+
+/* Method */
+.method ul { font-size: 15px; line-height: 1.5; }
+.method li::marker { color: #A85E25; }
+
 @media (max-width: 520px) {
-  .flour-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) 40px; column-gap: 8px; row-gap: 6px; }
-  .flour-row .stepper { grid-column: 2; grid-row: 2; }
+  /* Recipes scroll sideways instead of wrapping into four rows */
+  .recipe-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 -20px; padding: 0 20px 2px; scrollbar-width: none; scroll-padding: 0 20px; }
+  .recipe-chips::-webkit-scrollbar { display: none; }
+  /* Flour type on top, a full-width stepper below */
+  .flour-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px; column-gap: 8px; row-gap: 6px; }
+  .flour-row .stepper { grid-column: 1; grid-row: 2; }
   .flour-row .stepper .relative { flex: 1; }
-  .flour-row .stepper input { width: 100% !important; }
-  .flour-row .remove { grid-column: 3; grid-row: 1; }
+  .flour-row .stepper input { width: 100% !important; text-align: right; padding-right: 30px !important; }
+  .flour-row .remove { grid-column: 2; grid-row: 1; }
+  .card { padding: 14px 14px; }
 }
-.rise h2 { color: #79512F; }
-.calculator .time-input { width: auto; min-width: 7.5rem; padding: 0 12px; text-align: center; font-variant-numeric: tabular-nums; }
-.cold-check { accent-color: #A85E25; }
-.rise-result { padding-top: 6px; }
-.calculator .cold-check { width: 20px; height: 20px; padding: 0; margin: 0; }
