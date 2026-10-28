@@ -12,6 +12,9 @@ body { margin: 0; background: #F6F1E7; }
 .lang-switch { gap: 2px; }
 .lang-switch button { letter-spacing: .06em; }
 
+/* Young Serif for the headings: a warm, bakery-label voice */
+.calculator h1, .calculator h2, .rise-out > :first-child { font-family: "Young Serif", Georgia, serif !important; font-weight: 400 !important; letter-spacing: 0 !important; }
+
 /* Section headings: plain sentence case, one colour */
 .calculator h2 { font-size: 1rem; font-weight: 650; letter-spacing: -.01em !important; color: #38291F; }
 
@@ -53,15 +56,30 @@ body { margin: 0; background: #F6F1E7; }
 .method ul { font-size: 15px; line-height: 1.5; }
 .method li::marker { color: #A85E25; }
 
+/* Colour coding: one colour per flour type, used in rows, bar and loaf */
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.mix-loaf { width: 66px; height: 44px; }
+.mix-bar { display: flex; gap: 2px; height: 10px; border-radius: 5px; overflow: hidden; }
+.mix-bar > div { min-width: 4px; }
+
+/* Rise timeline */
+.timeline-bar { position: relative; height: 30px; border-radius: 6px; background: #F1E9DA; overflow: hidden; }
+.timeline-night { position: absolute; top: 0; bottom: 0; background: #DCE2E6; display: flex; align-items: flex-end; padding: 0 6px 3px; }
+.timeline-night span { font-size: 11px; line-height: 1; color: #55636D; }
+.timeline-ready { position: absolute; top: 6px; bottom: 6px; background: #A85E25; border-radius: 4px; }
+.timeline-mix { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #38291F; }
+.timeline-ticks { position: relative; height: 16px; margin-top: 4px; font-size: 11px; color: #73604D; font-variant-numeric: tabular-nums; }
+.timeline-ticks span { position: absolute; transform: translateX(-50%); }
+
 @media (max-width: 520px) {
   /* Recipes scroll sideways instead of wrapping into four rows */
   .recipe-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 -20px; padding: 0 20px 2px; scrollbar-width: none; scroll-padding: 0 20px; }
   .recipe-chips::-webkit-scrollbar { display: none; }
   /* Flour type on top, a full-width stepper below */
-  .flour-row { display: grid; grid-template-columns: minmax(0, 1fr) 40px; column-gap: 8px; row-gap: 6px; }
-  .flour-row .stepper { grid-column: 1; grid-row: 2; }
+  .flour-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) 40px; column-gap: 8px; row-gap: 6px; }
+  .flour-row .stepper { grid-column: 2; grid-row: 2; }
   .flour-row .stepper .relative { flex: 1; }
   .flour-row .stepper input { width: 100% !important; text-align: right; padding-right: 30px !important; }
-  .flour-row .remove { grid-column: 2; grid-row: 1; }
+  .flour-row .remove { grid-column: 3; grid-row: 1; }
   .card { padding: 14px 14px; }
 }

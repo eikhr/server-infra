@@ -6,22 +6,79 @@ const crust = "#F6F1E7";
 const crustLight = "#FFFDF7";
 const crustLine = "#D8CBB5";
 const MAX_FLOURS = 5;
+const waterBlue = "#628B94";
+const starterGold = "#A85E25";
+const saltGrey = "#A9A58F";
+
+// Average of the flour colours, weighted by grams
+function blendColor(parts) {
+  const total = parts.reduce((a, p) => a + p.w, 0) || 1;
+  const rgb = [0, 1, 2].map((i) =>
+    Math.round(parts.reduce((a, p) => a + parseInt(p.color.slice(1 + i * 2, 3 + i * 2), 16) * p.w, 0) / total),
+  );
+  return `#${rgb.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function Swatch({ color }) {
+  return <span className="swatch shrink-0" style={{ background: color }} />;
+}
+
+// A tin loaf whose crumb takes the colour of the flour mix
+function Loaf({ color }) {
+  return (
+    <svg className="mix-loaf shrink-0" viewBox="0 0 120 80" fill="none" aria-hidden="true">
+      <path d="M14 38C14 18 34 8 60 8C86 8 106 18 106 38V72H14Z" fill={color} stroke="#5A3A20" strokeWidth="3" strokeLinejoin="round" />
+      <path d="M14 40H106" stroke="#5A3A20" strokeWidth="2" opacity=".35" />
+      <path d="M40 22C46 18 52 18 58 22M66 20C72 16 78 16 84 20" stroke="#FFF4DC" strokeWidth="4" strokeLinecap="round" opacity=".8" />
+      <path d="M8 72H112" stroke="#5A3A20" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// Mixing time to the morning after, with the night shaded and the ready window marked
+function RiseTimeline({ mixAt, range, nightLabel }) {
+  const [hh, mm] = mixAt.split(":").map(Number);
+  const mix = hh + mm / 60;
+  const span = Math.max(16, Math.ceil(range[1] + 2));
+  const pct = (h) => `${(Math.min(span, Math.max(0, h)) / span) * 100}%`;
+  const nights = [-1, 0, 1].map((d) => [23 - mix + 24 * d, 31 - mix + 24 * d]).filter(([a, b]) => b > 0 && a < span);
+  const ticks = [];
+  for (let h = Math.ceil(mix / 3) * 3 - mix; h <= span - 0.75; h += 3) if (h >= 0.75) ticks.push(h);
+  return (
+    <div className="timeline mt-3" aria-hidden="true">
+      <div className="timeline-bar">
+        {nights.map(([a, b], i) => (
+          <div key={i} className="timeline-night" style={{ left: pct(a), width: `calc(${pct(b)} - ${pct(a)})` }}>
+            <span>{nightLabel}</span>
+          </div>
+        ))}
+        <div className="timeline-ready" style={{ left: pct(range[0]), width: `calc(${pct(range[1])} - ${pct(range[0])})` }} />
+        <div className="timeline-mix" />
+      </div>
+      <div className="timeline-ticks">
+        {ticks.map((h) => (
+          <span key={h} style={{ left: pct(h) }}>{String(Math.round(mix + h) % 24).padStart(2, "0")}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const display = { fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', fontWeight: 650, letterSpacing: "-0.035em" };
 const sans = { fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' };
 
 // Baseline hydration each flour wants in a sourdough loaf
 const FLOUR_TYPES = [
-  { key: "bread", name: { en: "Strong bread flour", no: "Hvetemel special" }, hyd: 0.72 },
-  { key: "ap", name: { en: "All-purpose flour", no: "Hvetemel, siktet" }, hyd: 0.67 },
-  { key: "ww", name: { en: "Whole wheat", no: "Sammalt hvete" }, hyd: 0.83 },
-  { key: "rye", name: { en: "Rye", no: "Rugmel" }, hyd: 0.9 },
-  { key: "wrye", name: { en: "Wholemeal rye", no: "Sammalt rug" }, hyd: 0.95 },
-  { key: "spelt", name: { en: "Spelt", no: "Speltmel" }, hyd: 0.66 },
-  { key: "wspelt", name: { en: "Wholemeal spelt", no: "Sammalt spelt" }, hyd: 0.75 },
-  { key: "durum", name: { en: "Durum / semolina", no: "Durum / semulegryn" }, hyd: 0.65 },
-  { key: "einkorn", name: { en: "Einkorn", no: "Enkorn" }, hyd: 0.6 },
-  { key: "oat", name: { en: "Oat flour", no: "Havremel" }, hyd: 0.8 },
+  { key: "bread", color: "#D9AE66", name: { en: "Strong bread flour", no: "Hvetemel special" }, hyd: 0.72 },
+  { key: "ap", color: "#E6C88F", name: { en: "All-purpose flour", no: "Hvetemel, siktet" }, hyd: 0.67 },
+  { key: "ww", color: "#A9743F", name: { en: "Whole wheat", no: "Sammalt hvete" }, hyd: 0.83 },
+  { key: "rye", color: "#8C6D55", name: { en: "Rye", no: "Rugmel" }, hyd: 0.9 },
+  { key: "wrye", color: "#5C4231", name: { en: "Wholemeal rye", no: "Sammalt rug" }, hyd: 0.95 },
+  { key: "spelt", color: "#C99C5A", name: { en: "Spelt", no: "Speltmel" }, hyd: 0.66 },
+  { key: "wspelt", color: "#93693C", name: { en: "Wholemeal spelt", no: "Sammalt spelt" }, hyd: 0.75 },
+  { key: "durum", color: "#E2B84C", name: { en: "Durum / semolina", no: "Durum / semulegryn" }, hyd: 0.65 },
+  { key: "einkorn", color: "#BF8F45", name: { en: "Einkorn", no: "Enkorn" }, hyd: 0.6 },
+  { key: "oat", color: "#CDBA8E", name: { en: "Oat flour", no: "Havremel" }, hyd: 0.8 },
 ];
 const byKey = Object.fromEntries(FLOUR_TYPES.map((f) => [f.key, f]));
 
@@ -47,6 +104,8 @@ const STRINGS = {
     coldStarter: "Starter straight from the fridge",
     readyAt: (a, b) => `Ready around ${a}–${b}`,
     riseFor: (h) => `${h} h rise`,
+    night: "night",
+    doughWeight: (g) => `${g} g of dough`,
     riseNote: "A rough guide to when the dough has grown by a third to a half. Trust the dough over the clock.",
     addFlour: "Add a flour",
     feelHeading: "How should the dough feel?",
@@ -83,6 +142,8 @@ const STRINGS = {
     coldStarter: "Surdeig rett fra kjøleskapet",
     readyAt: (a, b) => `Klar ca. kl. ${a}–${b}`,
     riseFor: (h) => `${h} t heving`,
+    night: "natt",
+    doughWeight: (g) => `${g} g deig`,
     riseNote: "Et grovt anslag for når deigen har vokst med en tredjedel til halvparten. Stol mer på deigen enn klokka.",
     addFlour: "Legg til mel",
     feelHeading: "Hvordan skal deigen kjennes?",
@@ -309,9 +370,10 @@ function TotalInput({ value, onCommit, ariaLabel, unit = "g" }) {
   );
 }
 
-function AmountRow({ label, note, muted, children }) {
+function AmountRow({ label, note, muted, swatch, children }) {
   return (
     <div className="flex items-center gap-3 min-h-12 py-1">
+      {swatch === undefined ? null : swatch ? <Swatch color={swatch} /> : <span className="swatch shrink-0" />}
       <div className="flex-1 min-w-0" style={{ color: muted ? inkSoft : ink, ...sans }}>
         {label}
         {note && <div className="note">{note}</div>}
@@ -419,6 +481,14 @@ export default function SourdoughCalculator() {
     return `${String(Math.floor(mins / 60) % 24).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
   };
 
+  const mixColor = blendColor(flours.map((f) => ({ w: f.grams || 0, color: byKey[f.type].color })));
+  const segments = [
+    ...flours.map((f) => ({ w: f.grams || 0, color: byKey[f.type].color })),
+    { w: Math.max(0, r.waterAdd), color: waterBlue },
+    { w: r.starter, color: starterGold },
+    { w: r.salt, color: saltGrey },
+  ].filter((x) => x.w > 0);
+
   const oatGrams = flours.reduce((a, f) => a + (f.type === "oat" ? f.grams || 0 : 0), 0);
   const oatShare = r.addedFlour > 0 ? oatGrams / r.addedFlour : 0;
 
@@ -481,6 +551,7 @@ export default function SourdoughCalculator() {
           <div className="mt-1">
             {flours.map((f) => (
               <div key={f.id} className="flour-row py-2" style={{ borderBottom: `1px solid ${crustLine}` }}>
+                <Swatch color={byKey[f.type].color} />
                 <select
                   value={f.type}
                   aria-label={t.flourType}
@@ -542,18 +613,30 @@ export default function SourdoughCalculator() {
 
         {/* Results */}
         <section className="card mt-8">
-          <h2 style={display}>{t.addToBowl}</h2>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <h2 style={display}>{t.addToBowl}</h2>
+              <div className="note">{t.doughWeight(Math.round(r.total))}</div>
+            </div>
+            <Loaf color={mixColor} />
+          </div>
+          <div className="mix-bar mt-3" aria-hidden="true">
+            {segments.map((sg, i) => (
+              <div key={i} style={{ flexGrow: sg.w, background: sg.color }} />
+            ))}
+          </div>
           <div className="mt-2">
-            <AmountRow label={t.flour}>
+            <AmountRow label={t.flour} swatch={mixColor}>
               <Stepper step={100} t={t} onStep={(d) => r.addedFlour + d > 0 && scaleFlourTo(r.addedFlour + d)}>
                 <TotalInput ariaLabel={t.flour} value={r.addedFlour} onCommit={scaleFlourTo} />
               </Stepper>
             </AmountRow>
-            <AmountRow label={t.water}>
+            <AmountRow label={t.water} swatch={waterBlue}>
               <StaticAmount value={Math.round(Math.max(0, r.waterAdd))} />
             </AmountRow>
             <AmountRow
               label={t.starter}
+              swatch={starterGold}
               note={
                 starterOverride === null ? (
                   t.starterAuto
@@ -568,15 +651,15 @@ export default function SourdoughCalculator() {
                 <GramsInput ariaLabel={t.starterAmount} value={r.starter} onChange={(g) => setStarterOverride(g)} />
               </Stepper>
             </AmountRow>
-            <AmountRow label={t.salt} note={t.saltNote}>
+            <AmountRow label={t.salt} note={t.saltNote} swatch={saltGrey}>
               <StaticAmount value={(Math.round(r.salt * 10) / 10).toLocaleString(lang === "no" ? "nb" : "en", { minimumFractionDigits: 1 })} />
             </AmountRow>
           </div>
           <div className="card-divider">
-            <AmountRow label={t.hydration} muted>
+            <AmountRow label={t.hydration} muted swatch={null}>
               <StaticAmount value={r.totalFlour > 0 ? Math.round(r.hyd * 100) : 0} unit="%" muted />
             </AmountRow>
-            <AmountRow label={t.totalDough}>
+            <AmountRow label={t.totalDough} swatch={null}>
               <Stepper step={100} t={t} onStep={(d) => r.total + d > 0 && scaleTotalTo(r.total + d)}>
                 <TotalInput ariaLabel={t.totalDough} value={r.total} onCommit={scaleTotalTo} />
               </Stepper>
@@ -615,6 +698,7 @@ export default function SourdoughCalculator() {
                 {t.readyAt(clockAfter(riseRange[0]), clockAfter(riseRange[1]))}
               </div>
               <div className="note tabular-nums">{t.riseFor(`${fmtHours(riseRange[0])}–${fmtHours(riseRange[1])}`)}</div>
+              <RiseTimeline mixAt={rise.mixAt} range={riseRange} nightLabel={t.night} />
             </div>
           )}
           <p className="note mt-3">{t.riseNote}</p>
