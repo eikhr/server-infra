@@ -43,8 +43,15 @@ const STRINGS = {
     flourType: "Flour type",
     amount: (name) => `${name} amount`,
     removeFlour: "Remove flour",
-    less: (g) => `${g} g less`,
-    more: (g) => `${g} g more`,
+    less: (n, u) => `${n} ${u} less`,
+    more: (n, u) => `${n} ${u} more`,
+    riseHeading: "How long will it rise?",
+    roomTemp: "Room temperature",
+    mixedAt: "Mixed at",
+    coldStarter: "Starter straight from the fridge",
+    hours: "h",
+    readyAround: (a, b) => `ready around ${a}–${b}`,
+    riseNote: "A rough guide to when the dough has grown by a third to a half. Whole grain speeds it up; a sluggish starter or cool dough slows it down. Trust the dough over the clock.",
     addFlour: "Add a flour",
     feelHeading: "How should the dough feel?",
     feels: { firmer: "Firmer", standard: "Standard", slack: "Slack" },
@@ -73,8 +80,15 @@ const STRINGS = {
     flourType: "Meltype",
     amount: (name) => `Mengde ${name.toLowerCase()}`,
     removeFlour: "Fjern mel",
-    less: (g) => `${g} g mindre`,
-    more: (g) => `${g} g mer`,
+    less: (n, u) => `${n} ${u} mindre`,
+    more: (n, u) => `${n} ${u} mer`,
+    riseHeading: "Hvor lenge skal den heve?",
+    roomTemp: "Romtemperatur",
+    mixedAt: "Blandet kl.",
+    coldStarter: "Surdeig rett fra kjøleskapet",
+    hours: "t",
+    readyAround: (a, b) => `klar ca. kl. ${a}–${b}`,
+    riseNote: "Et grovt anslag for når deigen har vokst med en tredjedel til halvparten. Grovt mel gjør det raskere; treg surdeig eller kald deig gjør det tregere. Stol mer på deigen enn klokka.",
     addFlour: "Legg til mel",
     feelHeading: "Hvordan skal deigen kjennes?",
     feels: { firmer: "Fastere", standard: "Standard", slack: "Løsere" },
@@ -203,6 +217,25 @@ const RECIPES = [
   },
 ];
 
+// Bulk rise until the dough has grown by a third to a half. Each halving of the
+// starter costs one more doubling time, and fermentation runs about twice as
+// fast per 8 °C. Calibrated to roughly 6.5 h for 20 % starter at 21 °C.
+const WHOLE_GRAIN = new Set(["ww", "rye", "wrye", "wspelt"]);
+function bulkHours({ starterShare, temp, wholeShare, coldStarter }) {
+  if (starterShare <= 0) return null;
+  const doubling = 2.7 * 2 ** ((21 - temp) / 8);
+  const doublings = Math.max(1, 2.4 + Math.log2(0.2 / starterShare));
+  return doubling * doublings * (1 - 0.2 * wholeShare) * (coldStarter ? 1.2 : 1);
+}
+
+function loadPrefs() {
+  try {
+    return JSON.parse(localStorage.getItem("sourdough-rise")) || {};
+  } catch {
+    return {};
+  }
+}
+
 function initialLang() {
   try {
     const saved = localStorage.getItem("sourdough-lang");
@@ -215,7 +248,7 @@ function initialLang() {
 let nextId = 3;
 
 // −/+ buttons around an amount, so phones rarely need the number keyboard
-function Stepper({ step, onStep, t, children }) {
+function Stepper({ step, onStep, t, unit = "g", children }) {
   const btn = (dir, label, text) => (
     <button
       type="button"
@@ -229,9 +262,9 @@ function Stepper({ step, onStep, t, children }) {
   );
   return (
     <div className="stepper flex items-stretch h-12 shrink-0 rounded-md overflow-hidden" style={{ background: crustLight, border: `1px solid ${crustLine}` }}>
-      {btn(-1, t.less(step), "−")}
+      {btn(-1, t.less(step, unit), "−")}
       {children}
-      {btn(1, t.more(step), "+")}
+      {btn(1, t.more(step, unit), "+")}
     </div>
   );
 }
@@ -255,7 +288,7 @@ function GramsInput({ value, onChange, ariaLabel, wide }) {
 }
 
 // Holds a draft while typing so a half-typed "1" doesn't scale the recipe down to one gram
-function TotalInput({ value, onCommit, ariaLabel }) {
+function TotalInput({ value, onCommit, ariaLabel, unit = "g" }) {
   const [draft, setDraft] = useState(null);
   const commit = () => {
     const g = parseFloat(draft);
@@ -276,7 +309,7 @@ function TotalInput({ value, onCommit, ariaLabel }) {
         className="w-24 h-12 text-center text-lg rounded-md bg-transparent focus:outline-none focus-visible:ring-2"
         style={{ color: ink, border: `1px solid ${crustLine}`, ...display }}
       />
-      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm pointer-events-none" style={{ color: inkSoft }}>g</span>
+      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm pointer-events-none" style={{ color: inkSoft }}>{unit}</span>
     </div>
   );
 }
@@ -306,6 +339,14 @@ export default function SourdoughCalculator() {
   const [feel, setFeel] = useState("standard");
   const [starterOverride, setStarterOverride] = useState(null); // null = automatic
   const [recipe, setRecipe] = useState(null);
+  const [rise, setRise] = useState(() => ({ temp: 21, mixAt: "18:00", coldStarter: false, ...loadPrefs() }));
+  const updateRise = (patch) => setRise((x) => ({ ...x, ...patch }));
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("sourdough-rise", JSON.stringify(rise));
+    } catch {}
+  }, [rise]);
   const [lang, setLang] = useState(initialLang);
   const t = STRINGS[lang];
   const activeRecipe = RECIPES.find((x) => x.key === recipe);
@@ -358,6 +399,21 @@ export default function SourdoughCalculator() {
   };
   const scaleFlourTo = (target) => r.addedFlour > 0 && scaleBy(target / r.addedFlour);
   const scaleTotalTo = (target) => r.total > 0 && scaleBy(target / r.total);
+
+  const wholeGrams = flours.reduce((a, f) => a + (WHOLE_GRAIN.has(f.type) ? f.grams || 0 : 0), 0);
+  const riseH = bulkHours({
+    starterShare: r.addedFlour > 0 ? r.starter / r.addedFlour : 0,
+    temp: rise.temp,
+    wholeShare: r.addedFlour > 0 ? wholeGrams / r.addedFlour : 0,
+    coldStarter: rise.coldStarter,
+  });
+  const riseRange = riseH && [riseH * 0.85, riseH * 1.15];
+  const fmtHours = (h) => (Math.round(h * 2) / 2).toLocaleString(lang === "no" ? "nb" : "en");
+  const clockAfter = (h) => {
+    const [hh, mm] = rise.mixAt.split(":").map(Number);
+    const mins = Math.round((hh * 60 + mm + h * 60) / 15) * 15;
+    return `${String(Math.floor(mins / 60) % 24).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+  };
 
   const oatGrams = flours.reduce((a, f) => a + (f.type === "oat" ? f.grams || 0 : 0), 0);
   const oatShare = r.addedFlour > 0 ? oatGrams / r.addedFlour : 0;
@@ -559,6 +615,51 @@ export default function SourdoughCalculator() {
           <p className="mt-4 text-xs leading-relaxed" style={{ color: inkSoft, ...sans }}>
             {t.footnote}
           </p>
+        </div>
+
+        {/* Rise time */}
+        <div className="rise mt-8">
+          <h2 className="text-xl" style={display}>{t.riseHeading}</h2>
+          <div className="mt-3 text-sm" style={{ color: ink, ...sans }}>
+            <div className="flex items-center justify-between gap-3 py-2" style={{ borderBottom: `1px solid ${crustLine}` }}>
+              <span>{t.roomTemp}</span>
+              <Stepper step={1} unit="°C" t={t} onStep={(d) => updateRise({ temp: Math.min(32, Math.max(10, rise.temp + d)) })}>
+                <TotalInput unit="°C" ariaLabel={t.roomTemp} value={rise.temp} onCommit={(v) => updateRise({ temp: Math.min(32, Math.max(10, Math.round(v))) })} />
+              </Stepper>
+            </div>
+            <div className="flex items-center justify-between gap-3 py-2" style={{ borderBottom: `1px solid ${crustLine}` }}>
+              <span>{t.mixedAt}</span>
+              <input
+                type="time"
+                aria-label={t.mixedAt}
+                value={rise.mixAt}
+                onChange={(e) => e.target.value && updateRise({ mixAt: e.target.value })}
+                className="time-input h-12 px-3 rounded-md text-lg focus:outline-none focus-visible:ring-2"
+                style={{ color: ink, border: `1px solid ${crustLine}`, ...display }}
+              />
+            </div>
+            <label className="flex items-center gap-3 py-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rise.coldStarter}
+                onChange={(e) => updateRise({ coldStarter: e.target.checked })}
+                className="cold-check w-5 h-5 shrink-0"
+              />
+              <span>{t.coldStarter}</span>
+            </label>
+          </div>
+          {riseRange && (
+            <div className="rise-result mt-2 flex items-baseline justify-between gap-3 flex-wrap">
+              <span className="tabular-nums" style={{ color: ink, fontSize: 30, ...display }}>
+                {fmtHours(riseRange[0])}–{fmtHours(riseRange[1])}
+                <span className="text-sm ml-1" style={{ color: inkSoft }}>{t.hours}</span>
+              </span>
+              <span className="text-sm tabular-nums" style={{ color: starterGold, ...sans }}>
+                {t.readyAround(clockAfter(riseRange[0]), clockAfter(riseRange[1]))}
+              </span>
+            </div>
+          )}
+          <p className="mt-2 text-xs leading-relaxed" style={{ color: inkSoft, ...sans }}>{t.riseNote}</p>
         </div>
 
         {/* Method */}

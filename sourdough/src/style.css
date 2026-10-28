@@ -46,3 +46,8 @@ body { margin: 0; background: #F6F1E7; }
   .flour-row .stepper input { width: 100% !important; }
   .flour-row .remove { grid-column: 3; grid-row: 1; }
 }
+.rise h2 { color: #79512F; }
+.calculator .time-input { width: auto; min-width: 7.5rem; padding: 0 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.cold-check { accent-color: #A85E25; }
+.rise-result { padding-top: 6px; }
+.calculator .cold-check { width: 20px; height: 20px; padding: 0; margin: 0; }
