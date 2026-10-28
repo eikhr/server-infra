@@ -58,7 +58,6 @@ body { margin: 0; background: #F6F1E7; }
 
 /* Colour coding: one colour per flour type, used in rows, bar and loaf */
 .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
-.mix-loaf { width: 66px; height: 44px; }
 .mix-bar { display: flex; gap: 2px; height: 10px; border-radius: 5px; overflow: hidden; }
 .mix-bar > div { min-width: 4px; }
 

@@ -23,18 +23,6 @@ function Swatch({ color }) {
   return <span className="swatch shrink-0" style={{ background: color }} />;
 }
 
-// A tin loaf whose crumb takes the colour of the flour mix
-function Loaf({ color }) {
-  return (
-    <svg className="mix-loaf shrink-0" viewBox="0 0 120 80" fill="none" aria-hidden="true">
-      <path d="M14 38C14 18 34 8 60 8C86 8 106 18 106 38V72H14Z" fill={color} stroke="#5A3A20" strokeWidth="3" strokeLinejoin="round" />
-      <path d="M14 40H106" stroke="#5A3A20" strokeWidth="2" opacity=".35" />
-      <path d="M40 22C46 18 52 18 58 22M66 20C72 16 78 16 84 20" stroke="#FFF4DC" strokeWidth="4" strokeLinecap="round" opacity=".8" />
-      <path d="M8 72H112" stroke="#5A3A20" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 // Mixing time to the morning after, with the night shaded and the ready window marked
 function RiseTimeline({ mixAt, range, nightLabel }) {
   const [hh, mm] = mixAt.split(":").map(Number);
@@ -613,13 +601,8 @@ export default function SourdoughCalculator() {
 
         {/* Results */}
         <section className="card mt-8">
-          <div className="flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <h2 style={display}>{t.addToBowl}</h2>
-              <div className="note">{t.doughWeight(Math.round(r.total))}</div>
-            </div>
-            <Loaf color={mixColor} />
-          </div>
+          <h2 style={display}>{t.addToBowl}</h2>
+          <div className="note">{t.doughWeight(Math.round(r.total))}</div>
           <div className="mix-bar mt-3" aria-hidden="true">
             {segments.map((sg, i) => (
               <div key={i} style={{ flexGrow: sg.w, background: sg.color }} />
